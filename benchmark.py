@@ -5,9 +5,9 @@ Evaluate documentation quality by comparing LLM answers with and without
 documentation context from MCP servers (Context7, etc.)
 
 Usage:
-    python benchmark.py scan -q questions/onetbb.json --source context7:uxlfoundation/onetbb
-    python benchmark.py scan -q questions/onetbb.json --source baseline
-    python benchmark.py scan -q questions/onetbb.json --source context7:uxlfoundation/onetbb --source baseline
+    python benchmark.py scan --source context7:uxlfoundation/onetbb
+    python benchmark.py scan --source baseline
+    python benchmark.py scan --source context7:uxlfoundation/onetbb --source baseline
     python benchmark.py compare results/run_*.json
     python benchmark.py docs --repo uxlfoundation/oneTBB
 """
@@ -15,7 +15,6 @@ Usage:
 import argparse
 import json
 import os
-import re
 import sys
 import time
 import urllib.request
@@ -147,27 +146,18 @@ def get_client(provider: str = "openai"):
     """Get OpenAI-compatible client."""
     from openai import OpenAI
 
-    def _read_key(env_var: str, file_path: str) -> str:
-        key = os.environ.get(env_var, "")
-        if key:
-            return key
-        path = Path(os.path.expanduser(file_path))
-        if path.exists():
-            return path.read_text().strip()
-        raise FileNotFoundError(
-            f"API key not found. Set {env_var} env var or create {file_path}"
-        )
-
     if provider == "openai":
-        key = _read_key("OPENAI_API_KEY", "~/.config/openai/api_key")
+        key = os.environ.get("OPENAI_API_KEY") or \
+            Path(os.path.expanduser("~/.config/openai/api_key")).read_text().strip()
         return OpenAI(api_key=key)
     elif provider == "deepseek":
-        key = _read_key("DEEPSEEK_API_KEY", "~/.config/deepseek/api_key")
+        key = Path(os.path.expanduser("~/.config/deepseek/api_key")).read_text().strip()
         return OpenAI(api_key=key, base_url="https://api.deepseek.com")
     elif provider == "anthropic":
-        from openai import OpenAI
-        key = _read_key("ANTHROPIC_API_KEY", "~/.config/anthropic/api_key")
-        return OpenAI(api_key=key, base_url="https://api.anthropic.com/v1/")
+        # For scoring via Claude — use Anthropic SDK
+        import anthropic
+        key = os.environ.get("ANTHROPIC_API_KEY", "")
+        return anthropic.Anthropic(api_key=key) if key else None
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -180,7 +170,7 @@ def fetch_context7(library_id: str, query: str, max_tokens: int = 8000) -> str:
     """Fetch docs from Context7. Caches responses locally."""
     import hashlib
 
-    cache_key = hashlib.sha256(f"{library_id}:{query}:{max_tokens}".encode()).hexdigest()
+    cache_key = hashlib.md5(f"{library_id}:{query}:{max_tokens}".encode()).hexdigest()
     cache_file = CACHE_DIR / "context7" / f"{cache_key}.txt"
 
     if cache_file.exists():
@@ -356,23 +346,17 @@ def score_answer(client, question: Question, answer: Answer,
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        print("    ⚠ Failed to parse scorer response, using defaults")
+        print(f"    ⚠ Failed to parse scorer response, using defaults")
         data = {}
-
-    def _clamp(val, lo=0, hi=5):
-        try:
-            return max(lo, min(hi, int(val)))
-        except (TypeError, ValueError):
-            return 0
 
     return Score(
         question_id=answer.question_id,
         source=answer.source,
-        correctness=_clamp(data.get("correctness", 0)),
-        completeness=_clamp(data.get("completeness", 0)),
-        specificity=_clamp(data.get("specificity", 0)),
-        code_quality=_clamp(data.get("code_quality", 0)),
-        actionability=_clamp(data.get("actionability", 0)),
+        correctness=data.get("correctness", 0),
+        completeness=data.get("completeness", 0),
+        specificity=data.get("specificity", 0),
+        code_quality=data.get("code_quality", 0),
+        actionability=data.get("actionability", 0),
         doc_gap=data.get("doc_gap", ""),
         hallucination_notes=data.get("hallucination_notes", ""),
         scorer_notes=data.get("scorer_notes", ""),
@@ -390,11 +374,7 @@ def load_questions(path: Path) -> list[Question]:
         data = json.load(f)
 
     questions = []
-    for i, q in enumerate(data.get("questions", data if isinstance(data, list) else [])):
-        if "id" not in q or "text" not in q:
-            raise ValueError(
-                f"Question entry {i} missing required 'id' or 'text' field"
-            )
+    for q in data.get("questions", data if isinstance(data, list) else []):
         questions.append(Question(
             id=q["id"],
             text=q["text"],
@@ -613,9 +593,7 @@ def cmd_scan(args):
 
             # Store full context separately (large)
             if answer.context_used:
-                safe_qid = re.sub(r"[^a-zA-Z0-9_-]", "_", question.id)
-                safe_src = re.sub(r"[^a-zA-Z0-9_-]", "_", source)
-                ctx_file = run_dir / f"context_{safe_qid}_{safe_src}.txt"
+                ctx_file = run_dir / f"context_{question.id}_{source.replace(':', '_').replace('/', '_')}.txt"
                 ctx_file.write_text(answer.context_used)
 
             all_evaluations.append(evaluation)
@@ -657,7 +635,7 @@ def cmd_scan(args):
 # Main: compare command
 # ---------------------------------------------------------------------------
 
-def cmd_compare(_args):
+def cmd_compare(args):
     """Compare multiple benchmark runs."""
     print("TODO: compare command")
 
@@ -666,7 +644,7 @@ def cmd_compare(_args):
 # Main: docs command
 # ---------------------------------------------------------------------------
 
-def cmd_docs(_args):
+def cmd_docs(args):
     """Scan raw documentation structure."""
     print("TODO: docs scanner")
 
