@@ -15,6 +15,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -602,7 +603,9 @@ def cmd_scan(args):
 
             # Store full context separately (large)
             if answer.context_used:
-                ctx_file = run_dir / f"context_{question.id}_{source.replace(':', '_').replace('/', '_')}.txt"
+                safe_qid = re.sub(r"[^a-zA-Z0-9_-]", "_", question.id)
+                safe_src = re.sub(r"[^a-zA-Z0-9_-]", "_", source)
+                ctx_file = run_dir / f"context_{safe_qid}_{safe_src}.txt"
                 ctx_file.write_text(answer.context_used)
 
             all_evaluations.append(evaluation)
