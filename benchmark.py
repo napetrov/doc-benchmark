@@ -359,14 +359,20 @@ def score_answer(client, question: Question, answer: Answer,
         print("    ⚠ Failed to parse scorer response, using defaults")
         data = {}
 
+    def _clamp(val, lo=0, hi=5):
+        try:
+            return max(lo, min(hi, int(val)))
+        except (TypeError, ValueError):
+            return 0
+
     return Score(
         question_id=answer.question_id,
         source=answer.source,
-        correctness=data.get("correctness", 0),
-        completeness=data.get("completeness", 0),
-        specificity=data.get("specificity", 0),
-        code_quality=data.get("code_quality", 0),
-        actionability=data.get("actionability", 0),
+        correctness=_clamp(data.get("correctness", 0)),
+        completeness=_clamp(data.get("completeness", 0)),
+        specificity=_clamp(data.get("specificity", 0)),
+        code_quality=_clamp(data.get("code_quality", 0)),
+        actionability=_clamp(data.get("actionability", 0)),
         doc_gap=data.get("doc_gap", ""),
         hallucination_notes=data.get("hallucination_notes", ""),
         scorer_notes=data.get("scorer_notes", ""),
@@ -384,7 +390,11 @@ def load_questions(path: Path) -> list[Question]:
         data = json.load(f)
 
     questions = []
-    for q in data.get("questions", data if isinstance(data, list) else []):
+    for i, q in enumerate(data.get("questions", data if isinstance(data, list) else [])):
+        if "id" not in q or "text" not in q:
+            raise ValueError(
+                f"Question entry {i} missing required 'id' or 'text' field"
+            )
         questions.append(Question(
             id=q["id"],
             text=q["text"],
