@@ -5,9 +5,9 @@ Evaluate documentation quality by comparing LLM answers with and without
 documentation context from MCP servers (Context7, etc.)
 
 Usage:
-    python benchmark.py scan --source context7:uxlfoundation/onetbb
-    python benchmark.py scan --source baseline
-    python benchmark.py scan --source context7:uxlfoundation/onetbb --source baseline
+    python benchmark.py scan -q questions/onetbb.json --source context7:uxlfoundation/onetbb
+    python benchmark.py scan -q questions/onetbb.json --source baseline
+    python benchmark.py scan -q questions/onetbb.json --source context7:uxlfoundation/onetbb --source baseline
     python benchmark.py compare results/run_*.json
     python benchmark.py docs --repo uxlfoundation/oneTBB
 """
@@ -154,10 +154,10 @@ def get_client(provider: str = "openai"):
         key = Path(os.path.expanduser("~/.config/deepseek/api_key")).read_text().strip()
         return OpenAI(api_key=key, base_url="https://api.deepseek.com")
     elif provider == "anthropic":
-        # For scoring via Claude — use Anthropic SDK
-        import anthropic
+        # Anthropic provides OpenAI SDK compatibility (since Feb 2025)
+        from openai import OpenAI
         key = os.environ.get("ANTHROPIC_API_KEY", "")
-        return anthropic.Anthropic(api_key=key) if key else None
+        return OpenAI(api_key=key, base_url="https://api.anthropic.com/v1/")
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -170,7 +170,7 @@ def fetch_context7(library_id: str, query: str, max_tokens: int = 8000) -> str:
     """Fetch docs from Context7. Caches responses locally."""
     import hashlib
 
-    cache_key = hashlib.md5(f"{library_id}:{query}:{max_tokens}".encode()).hexdigest()
+    cache_key = hashlib.sha256(f"{library_id}:{query}:{max_tokens}".encode()).hexdigest()
     cache_file = CACHE_DIR / "context7" / f"{cache_key}.txt"
 
     if cache_file.exists():
@@ -346,7 +346,7 @@ def score_answer(client, question: Question, answer: Answer,
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        print(f"    ⚠ Failed to parse scorer response, using defaults")
+        print("    ⚠ Failed to parse scorer response, using defaults")
         data = {}
 
     return Score(
@@ -635,7 +635,7 @@ def cmd_scan(args):
 # Main: compare command
 # ---------------------------------------------------------------------------
 
-def cmd_compare(args):
+def cmd_compare(_args):
     """Compare multiple benchmark runs."""
     print("TODO: compare command")
 
@@ -644,7 +644,7 @@ def cmd_compare(args):
 # Main: docs command
 # ---------------------------------------------------------------------------
 
-def cmd_docs(args):
+def cmd_docs(_args):
     """Scan raw documentation structure."""
     print("TODO: docs scanner")
 
