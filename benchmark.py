@@ -146,17 +146,26 @@ def get_client(provider: str = "openai"):
     """Get OpenAI-compatible client."""
     from openai import OpenAI
 
+    def _read_key(env_var: str, file_path: str) -> str:
+        key = os.environ.get(env_var, "")
+        if key:
+            return key
+        path = Path(os.path.expanduser(file_path))
+        if path.exists():
+            return path.read_text().strip()
+        raise FileNotFoundError(
+            f"API key not found. Set {env_var} env var or create {file_path}"
+        )
+
     if provider == "openai":
-        key = os.environ.get("OPENAI_API_KEY") or \
-            Path(os.path.expanduser("~/.config/openai/api_key")).read_text().strip()
+        key = _read_key("OPENAI_API_KEY", "~/.config/openai/api_key")
         return OpenAI(api_key=key)
     elif provider == "deepseek":
-        key = Path(os.path.expanduser("~/.config/deepseek/api_key")).read_text().strip()
+        key = _read_key("DEEPSEEK_API_KEY", "~/.config/deepseek/api_key")
         return OpenAI(api_key=key, base_url="https://api.deepseek.com")
     elif provider == "anthropic":
-        # Anthropic provides OpenAI SDK compatibility (since Feb 2025)
         from openai import OpenAI
-        key = os.environ.get("ANTHROPIC_API_KEY", "")
+        key = _read_key("ANTHROPIC_API_KEY", "~/.config/anthropic/api_key")
         return OpenAI(api_key=key, base_url="https://api.anthropic.com/v1/")
     else:
         raise ValueError(f"Unknown provider: {provider}")
