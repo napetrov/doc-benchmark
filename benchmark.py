@@ -34,60 +34,66 @@ RESULTS_DIR = Path(__file__).parent / "results"
 CACHE_DIR = Path(__file__).parent / ".cache"
 
 # Scoring rubric — defines what "good" means for each dimension
+# Each dimension scored 1-20, total max 100 points
 SCORING_RUBRIC = {
     "correctness": {
         "description": "Are the facts, APIs, code examples, and technical details accurate?",
-        "scale": "1-5",
+        "scale": "1-20",
         "criteria": {
-            1: "Major factual errors, wrong APIs, broken code",
-            2: "Some inaccuracies, outdated info, partially wrong code",
-            3: "Mostly correct, minor issues, code needs tweaks",
-            4: "Accurate, working code, correct APIs",
-            5: "Fully accurate, verified APIs, production-ready code",
+            1: "Completely wrong, fabricated APIs, non-functional code",
+            5: "Major factual errors, wrong APIs, broken code",
+            10: "Some inaccuracies, outdated info, partially wrong code",
+            15: "Mostly correct, minor issues, code needs tweaks",
+            18: "Accurate, working code, correct APIs",
+            20: "Fully accurate, verified APIs, production-ready code",
         },
     },
     "completeness": {
         "description": "Does the answer cover all aspects the question needs?",
-        "scale": "1-5",
+        "scale": "1-20",
         "criteria": {
-            1: "Misses most key topics, superficial",
-            2: "Covers some topics, significant gaps",
-            3: "Covers main topics, some gaps remain",
-            4: "Thorough coverage, minor omissions",
-            5: "Comprehensive, covers all expected topics",
+            1: "Almost no relevant content",
+            5: "Misses most key topics, superficial",
+            10: "Covers some topics, significant gaps",
+            15: "Covers main topics, some gaps remain",
+            18: "Thorough coverage, minor omissions",
+            20: "Comprehensive, covers all expected topics",
         },
     },
     "specificity": {
         "description": "Does it reference specific library APIs, functions, parameters (not generic advice)?",
-        "scale": "1-5",
+        "scale": "1-20",
         "criteria": {
-            1: "Completely generic, no library-specific content",
-            2: "Mostly generic with vague library mentions",
-            3: "Some specific APIs/functions mentioned",
-            4: "Good specificity, concrete API references",
-            5: "Highly specific, exact functions/params/signatures",
+            1: "Entirely irrelevant or off-topic",
+            5: "Completely generic, no library-specific content",
+            10: "Mostly generic with vague library mentions",
+            15: "Some specific APIs/functions mentioned",
+            18: "Good specificity, concrete API references",
+            20: "Highly specific, exact functions/params/signatures",
         },
     },
     "code_quality": {
         "description": "Are code examples working, idiomatic, and copy-paste ready?",
-        "scale": "1-5",
+        "scale": "1-20",
         "criteria": {
-            1: "No code or completely broken examples",
-            2: "Code present but won't compile/run",
-            3: "Code works with modifications needed",
-            4: "Working code, mostly idiomatic",
-            5: "Production-quality, idiomatic, copy-paste ready",
+            1: "No code provided when needed",
+            5: "Code completely broken or wrong",
+            10: "Code present but won't compile/run",
+            15: "Code works with modifications needed",
+            18: "Working code, mostly idiomatic",
+            20: "Production-quality, idiomatic, copy-paste ready",
         },
     },
     "actionability": {
         "description": "Can the developer immediately use this to solve their problem?",
-        "scale": "1-5",
+        "scale": "1-20",
         "criteria": {
-            1: "Not actionable, too vague or wrong",
-            2: "Partially actionable, needs significant research",
-            3: "Actionable with some additional work",
-            4: "Directly actionable, clear next steps",
-            5: "Immediately actionable, complete solution",
+            1: "Actively misleading or harmful",
+            5: "Not actionable, too vague or wrong",
+            10: "Partially actionable, needs significant research",
+            15: "Actionable with some additional work",
+            18: "Directly actionable, clear next steps",
+            20: "Immediately actionable, complete solution",
         },
     },
 }
@@ -135,8 +141,9 @@ class Score:
 
     @property
     def total(self) -> float:
+        """Total score out of 100 (sum of 5 dimensions × 20)."""
         return (self.correctness + self.completeness + self.specificity +
-                self.code_quality + self.actionability) / 5.0
+                self.code_quality + self.actionability)
 
 
 # ---------------------------------------------------------------------------
@@ -316,7 +323,7 @@ Difficulty: {question.difficulty}
 {answer.text[:4000]}
 
 ## Scoring Rubric
-Rate each dimension on a 1-5 scale:
+Rate each dimension on a 1-20 scale (total max 100 points):
 {rubric_text}
 
 ## Additional Analysis
@@ -326,11 +333,11 @@ Rate each dimension on a 1-5 scale:
 ## Output Format
 Return ONLY a JSON object (no markdown fences):
 {{
-  "correctness": <1-5>,
-  "completeness": <1-5>,
-  "specificity": <1-5>,
-  "code_quality": <1-5>,
-  "actionability": <1-5>,
+  "correctness": <1-20>,
+  "completeness": <1-20>,
+  "specificity": <1-20>,
+  "code_quality": <1-20>,
+  "actionability": <1-20>,
   "doc_gap": "<what's missing>",
   "hallucination_notes": "<any hallucinations found>",
   "scorer_notes": "<brief justification>"
@@ -359,7 +366,7 @@ def score_answer(client, question: Question, answer: Answer,
         print("    ⚠ Failed to parse scorer response, using defaults")
         data = {}
 
-    def _clamp(val, lo=0, hi=5):
+    def _clamp(val, lo=0, hi=20):
         try:
             return max(lo, min(hi, int(val)))
         except (TypeError, ValueError):
@@ -434,21 +441,24 @@ def generate_report(results: dict, output_path: Path):
 
         # Average scores
         dims = ["correctness", "completeness", "specificity", "code_quality", "actionability"]
-        lines.append("### Average Scores\n")
-        lines.append("| Dimension | Score (1-5) |")
-        lines.append("|-----------|-------------|")
+        lines.append("### Average Scores (out of 20 each)\n")
+        lines.append("| Dimension | Score (1-20) | Percentage |")
+        lines.append("|-----------|--------------|------------|")
         for dim in dims:
             vals = [s[dim] for s in source_scores if s[dim] > 0]
             avg = sum(vals) / len(vals) if vals else 0
-            bar = "█" * int(avg) + "░" * (5 - int(avg))
-            lines.append(f"| {dim} | {avg:.1f} {bar} |")
+            pct = (avg / 20) * 100
+            bar_len = int((avg / 20) * 10)  # 10-char bar
+            bar = "█" * bar_len + "░" * (10 - bar_len)
+            lines.append(f"| {dim} | {avg:.1f} {bar} | {pct:.0f}% |")
 
         total_vals = [
-            sum(s[d] for d in dims) / len(dims)
+            sum(s[d] for d in dims)
             for s in source_scores if all(s[d] > 0 for d in dims)
         ]
         overall = sum(total_vals) / len(total_vals) if total_vals else 0
-        lines.append(f"\n**Overall: {overall:.1f}/5.0**\n")
+        overall_pct = (overall / 100) * 100
+        lines.append(f"\n**Overall: {overall:.1f}/100 ({overall_pct:.0f}%)**\n")
 
         # By category
         categories = set(
@@ -458,11 +468,11 @@ def generate_report(results: dict, output_path: Path):
         )
         if categories:
             lines.append("### By Category\n")
-            lines.append("| Category | Avg Score | Questions |")
-            lines.append("|----------|-----------|-----------|")
+            lines.append("| Category | Avg Score | Percentage | Questions |")
+            lines.append("|----------|-----------|------------|-----------|")
             for cat in sorted(categories):
                 cat_scores = [
-                    sum(s[d] for d in dims) / len(dims)
+                    sum(s[d] for d in dims)
                     for r in results.get("evaluations", [])
                     for s in [r["score"]]
                     if s["source"] == source
@@ -470,7 +480,8 @@ def generate_report(results: dict, output_path: Path):
                     and all(s[d] > 0 for d in dims)
                 ]
                 avg = sum(cat_scores) / len(cat_scores) if cat_scores else 0
-                lines.append(f"| {cat} | {avg:.1f} | {len(cat_scores)} |")
+                pct = (avg / 100) * 100
+                lines.append(f"| {cat} | {avg:.1f}/100 | {pct:.0f}% | {len(cat_scores)} |")
 
         # Doc gaps
         gaps = [
@@ -534,8 +545,8 @@ def generate_report(results: dict, output_path: Path):
                 if s:
                     total = sum(s[d] for d in ["correctness", "completeness",
                                                "specificity", "code_quality",
-                                               "actionability"]) / 5
-                    row += f" {total:.1f} |"
+                                               "actionability"])
+                    row += f" {total:.0f}/100 |"
                 else:
                     row += " - |"
             lines.append(row)
@@ -622,7 +633,7 @@ def cmd_scan(args):
             all_scores.append(asdict(score))
 
             total = score.total
-            print(f"    Score: {total:.1f}/5 "
+            print(f"    Score: {total:.0f}/100 "
                   f"(C:{score.correctness} Co:{score.completeness} "
                   f"S:{score.specificity} Q:{score.code_quality} "
                   f"A:{score.actionability})")
