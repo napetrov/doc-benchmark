@@ -360,7 +360,7 @@ Return ONLY a JSON object (no markdown fences):
 
 
 def score_answer(client, question: Question, answer: Answer,
-                 model: str = "claude-sonnet-4-20250514") -> Score:
+                 model: str = "deepseek-chat") -> Score:
     """Score an answer using LLM-as-judge with rubric."""
     prompt = build_scoring_prompt(question, answer)
 
@@ -605,10 +605,11 @@ def cmd_scan(args):
 
     # Setup clients
     answer_client = get_client("openai")
-    scorer_client = get_client("anthropic")  # Use Claude for scoring
+    # Use Deepseek for scoring (Claude has insufficient credits)
+    scorer_client = get_client("deepseek")
 
     answer_model = args.answer_model
-    scorer_model = args.scorer_model
+    scorer_model = args.scorer_model if "claude" not in args.scorer_model else "deepseek-chat"
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_dir = RESULTS_DIR / f"run_{timestamp}"
@@ -733,8 +734,8 @@ def main():
         help="Model for generating answers (default: gpt-4o-mini)",
     )
     scan_parser.add_argument(
-        "--scorer-model", default="claude-sonnet-4-20250514",
-        help="Model for scoring answers (default: claude-sonnet-4-20250514)",
+        "--scorer-model", default="deepseek-chat",
+        help="Model for scoring answers (default: deepseek-chat)",
     )
     scan_parser.set_defaults(func=cmd_scan)
 
