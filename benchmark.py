@@ -151,9 +151,7 @@ class Score:
 # ---------------------------------------------------------------------------
 
 def get_client(provider: str = "openai"):
-    """Get OpenAI-compatible client."""
-    from openai import OpenAI
-
+    """Get LLM client (OpenAI, Anthropic, etc.)."""
     def _read_key(env_var: str, file_path: str) -> str:
         key = os.environ.get(env_var, "")
         if key:
@@ -166,15 +164,17 @@ def get_client(provider: str = "openai"):
         )
 
     if provider == "openai":
+        from openai import OpenAI
         key = _read_key("OPENAI_API_KEY", "~/.config/openai/api_key")
         return OpenAI(api_key=key)
     elif provider == "deepseek":
+        from openai import OpenAI
         key = _read_key("DEEPSEEK_API_KEY", "~/.config/deepseek/api_key")
         return OpenAI(api_key=key, base_url="https://api.deepseek.com")
     elif provider == "anthropic":
-        from openai import OpenAI
+        from anthropic import Anthropic
         key = _read_key("ANTHROPIC_API_KEY", "~/.config/anthropic/api_key")
-        return OpenAI(api_key=key, base_url="https://api.anthropic.com/v1/")
+        return Anthropic(api_key=key)
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -262,27 +262,42 @@ def generate_answer(client, question: Question, source: str,
             "training knowledge. Be specific, include code examples."
         )
 
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": question.text},
-        ],
-        temperature=0.3,
-        max_tokens=2000,
-    )
+    # Detect client type and use appropriate API
+    if hasattr(client, 'messages'):  # Anthropic client
+        resp = client.messages.create(
+            model=model,
+            system=system,
+            messages=[
+                {"role": "user", "content": question.text},
+            ],
+            temperature=0.3,
+            max_tokens=2000,
+        )
+        text = resp.content[0].text
+        tokens = resp.usage.input_tokens + resp.usage.output_tokens
+    else:  # OpenAI-compatible client
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": question.text},
+            ],
+            temperature=0.3,
+            max_tokens=2000,
+        )
+        text = resp.choices[0].message.content.strip()
+        tokens = resp.usage.total_tokens if resp.usage else 0
 
     elapsed = int((time.time() - start) * 1000)
-    usage = resp.usage
 
     return Answer(
         question_id=question.id,
         source=source,
-        text=resp.choices[0].message.content.strip(),
+        text=text,
         context_used=context,
         context_length=len(context) if context else 0,
         model=model,
-        tokens_used=usage.total_tokens if usage else 0,
+        tokens_used=tokens,
         latency_ms=elapsed,
     )
 
@@ -345,18 +360,28 @@ Return ONLY a JSON object (no markdown fences):
 
 
 def score_answer(client, question: Question, answer: Answer,
-                 model: str = "gpt-4o-mini") -> Score:
+                 model: str = "claude-sonnet-4-20250514") -> Score:
     """Score an answer using LLM-as-judge with rubric."""
     prompt = build_scoring_prompt(question, answer)
 
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.1,
-        max_tokens=500,
-    )
+    # Detect client type and use appropriate API
+    if hasattr(client, 'messages'):  # Anthropic client
+        resp = client.messages.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        text = resp.content[0].text
+    else:  # OpenAI-compatible client
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        text = resp.choices[0].message.content.strip()
 
-    text = resp.choices[0].message.content.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0]
 
@@ -580,7 +605,7 @@ def cmd_scan(args):
 
     # Setup clients
     answer_client = get_client("openai")
-    scorer_client = get_client("openai")  # TODO: separate scorer model
+    scorer_client = get_client("anthropic")  # Use Claude for scoring
 
     answer_model = args.answer_model
     scorer_model = args.scorer_model
@@ -708,8 +733,8 @@ def main():
         help="Model for generating answers (default: gpt-4o-mini)",
     )
     scan_parser.add_argument(
-        "--scorer-model", default="gpt-4o-mini",
-        help="Model for scoring answers (default: gpt-4o-mini)",
+        "--scorer-model", default="claude-sonnet-4-20250514",
+        help="Model for scoring answers (default: claude-sonnet-4-20250514)",
     )
     scan_parser.set_defaults(func=cmd_scan)
 
