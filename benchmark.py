@@ -1022,7 +1022,14 @@ def cmd_docs(args):
         lines.append(f"- ... ({len(docs)-50} more)")
 
     report = "\n".join(lines) + "\n"
-    out = Path(args.out) if getattr(args, "out", None) and args.out else (RESULTS_DIR / "docs_scan.md")
+    out_arg = (args.out or "").strip()
+    out = Path(out_arg) if out_arg else (RESULTS_DIR / "docs_scan.md")
+    # Safety: constrain output under RESULTS_DIR unless explicitly allowed.
+    out_resolved = out.resolve()
+    results_resolved = RESULTS_DIR.resolve()
+    if not str(out_resolved).startswith(str(results_resolved)):
+        raise ValueError(f"Refusing to write outside results/: {out}")
+
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report)
     print(report)
