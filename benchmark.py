@@ -754,18 +754,182 @@ def cmd_scan(args):
 # Main: compare command
 # ---------------------------------------------------------------------------
 
-def cmd_compare(_args):
-    """Compare multiple benchmark runs."""
-    print("TODO: compare command")
+def _load_results_path(p: str) -> dict:
+    path = Path(p)
+    if path.is_dir():
+        path = path / "results.json"
+    if not path.exists():
+        raise FileNotFoundError(f"Results not found: {path}")
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in {path}: {e}")
+
+
+def _avg_scores(scores: list[dict]) -> dict:
+    dims = list(SCORING_RUBRIC.keys())
+    out = {d: 0.0 for d in dims}
+    if not scores:
+        return {**out, "overall": 0.0}
+    for d in dims:
+        vals = [s.get(d, 0) for s in scores]
+        out[d] = sum(vals) / len(vals)
+    out["overall"] = sum(out[d] for d in dims)
+    return out
+
+
+def cmd_compare(args):
+    """Compare multiple benchmark runs (minimal useful summary)."""
+    runs = []
+    for p in args.runs:
+        r = _load_results_path(p)
+        runs.append((p, r))
+
+    # Build markdown report
+    dims = list(SCORING_RUBRIC.keys())
+    lines = ["# Benchmark Comparison\n"]
+
+    for p, r in runs:
+        meta = r.get("metadata", {})
+        lines.append(f"## Run: `{p}`\n")
+        lines.append(f"- timestamp: {meta.get('timestamp','N/A')}\n")
+        lines.append(f"- questions_file: {meta.get('questions_file','N/A')}\n")
+        lines.append(f"- sources: {', '.join(meta.get('sources', []))}\n")
+        lines.append(f"- answer_model: {meta.get('answer_model','N/A')}\n")
+        lines.append(f"- scorer_model: {meta.get('scorer_model','N/A')}\n")
+
+        scores = r.get("scores", [])
+        sources = meta.get("sources", [])
+
+        # Per-source averages
+        lines.append("### Per-source averages\n")
+        lines.append("| Source | Overall/100 | " + " | ".join([f"{d}/20" for d in dims]) + " |")
+        lines.append("|---|---:|" + "|".join(["---:"] * len(dims)) + "|")
+        per_source_avg = {}
+        for src in sources:
+            src_scores = [s for s in scores if s.get("source") == src]
+            avg = _avg_scores(src_scores)
+            per_source_avg[src] = avg
+            lines.append(
+                "| "
+                + src
+                + f" | {avg['overall']:.1f} | "
+                + " | ".join([f"{avg[d]:.1f}" for d in dims])
+                + " |"
+            )
+        lines.append("")
+
+        # Baseline deltas vs other sources (paired by question_id)
+        if "baseline" in sources and len(sources) > 1:
+            lines.append("### Baseline deltas (paired by question_id)\n")
+            lines.append("| Source | ΔOverall | " + " | ".join([f"Δ{d}" for d in dims]) + " |")
+            lines.append("|---|---:|" + "|".join(["---:"] * len(dims)) + "|")
+
+            base = {s["question_id"]: s for s in scores if s.get("source") == "baseline"}
+            for src in sources:
+                if src == "baseline":
+                    continue
+                other = {s["question_id"]: s for s in scores if s.get("source") == src}
+                qids = sorted(set(base.keys()) & set(other.keys()))
+                if not qids:
+                    continue
+                deltas = {d: [] for d in dims}
+                overall = []
+                for qid in qids:
+                    b = base[qid]
+                    o = other[qid]
+                    for d in dims:
+                        deltas[d].append((o.get(d, 0) - b.get(d, 0)))
+                    overall.append(sum(o.get(d, 0) for d in dims) - sum(b.get(d, 0) for d in dims))
+                lines.append(
+                    "| "
+                    + src
+                    + f" | {sum(overall)/len(overall):.1f} | "
+                    + " | ".join([f"{sum(deltas[d])/len(deltas[d]):.1f}" for d in dims])
+                    + " |"
+                )
+            lines.append("")
+
+    report = "\n".join(lines)
+
+    # Write file next to first run if it is a directory, else to CWD.
+    out_dir = Path(args.runs[0]) if args.runs else Path.cwd()
+    if out_dir.is_file():
+        out_dir = Path.cwd()
+    out_path = out_dir / "compare.md"
+    out_path.write_text(report)
+    print(report)
+    print(f"\n✅ Wrote: {out_path}\n")
 
 
 # ---------------------------------------------------------------------------
 # Main: docs command
 # ---------------------------------------------------------------------------
 
-def cmd_docs(_args):
-    """Scan raw documentation structure."""
-    print("TODO: docs scanner")
+def _http_json(url: str, headers: Optional[dict] = None) -> dict:
+    req = urllib.request.Request(url, headers={"User-Agent": "DocBenchmark/1.0", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def cmd_docs(args):
+    """Scan a GitHub repo docs structure (minimal, no auth required)."""
+    repo = args.repo.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
+        raise ValueError(f"Invalid --repo: {repo!r} (expected org/name)")
+
+    api = "https://api.github.com"
+    repo_info = _http_json(f"{api}/repos/{repo}")
+    default_branch = repo_info.get("default_branch", "main")
+    branch_info = _http_json(f"{api}/repos/{repo}/branches/{default_branch}")
+    tree_sha = branch_info["commit"]["commit"]["tree"]["sha"]
+    tree = _http_json(f"{api}/repos/{repo}/git/trees/{tree_sha}?recursive=1")
+
+    paths = [e["path"] for e in tree.get("tree", []) if e.get("type") == "blob"]
+
+    def _is_doc(p: str) -> bool:
+        p_low = p.lower()
+        if p_low in ("readme.md", "readme.rst", "readme.txt"):
+            return True
+        if p_low.startswith("docs/") or p_low.startswith("doc/"):
+            return True
+        if p_low.endswith((".md", ".rst", ".txt")):
+            return True
+        return False
+
+    docs = sorted([p for p in paths if _is_doc(p)])
+
+    # Basic doc taxonomy
+    buckets = {
+        "readme": [p for p in docs if p.lower().startswith("readme")],
+        "getting_started": [p for p in docs if "getting" in p.lower() or "quickstart" in p.lower() or "install" in p.lower()],
+        "api_reference": [p for p in docs if "api" in p.lower() or "reference" in p.lower()],
+        "examples": [p for p in docs if p.lower().startswith("examples/") or "example" in p.lower()],
+        "troubleshooting": [p for p in docs if "troubleshoot" in p.lower() or "faq" in p.lower() or "debug" in p.lower()],
+        "migration": [p for p in docs if "migrat" in p.lower() or "upgrade" in p.lower()],
+    }
+
+    lines = [f"# Docs scan: {repo}\n"]
+    lines.append(f"Default branch: `{default_branch}`\n")
+    lines.append(f"Total files: {len(paths)}\n")
+    lines.append(f"Doc-like files: {len(docs)}\n")
+
+    lines.append("## Buckets\n")
+    for k, v in buckets.items():
+        lines.append(f"- **{k}**: {len(v)}")
+
+    lines.append("\n## Top doc-like files\n")
+    for p in docs[:50]:
+        lines.append(f"- {p}")
+    if len(docs) > 50:
+        lines.append(f"- ... ({len(docs)-50} more)")
+
+    report = "\n".join(lines) + "\n"
+    out = Path(args.out) if getattr(args, "out", None) else (RESULTS_DIR / "docs_scan.md")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(report)
+    print(report)
+    print(f"\n✅ Wrote: {out}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -809,8 +973,9 @@ def main():
     compare_parser.set_defaults(func=cmd_compare)
 
     # docs
-    docs_parser = subparsers.add_parser("docs", help="Scan raw docs")
-    docs_parser.add_argument("--repo", required=True, help="GitHub repo")
+    docs_parser = subparsers.add_parser("docs", help="Scan GitHub docs structure")
+    docs_parser.add_argument("--repo", required=True, help="GitHub repo (org/name)")
+    docs_parser.add_argument("--out", default="", help="Output markdown path (default: results/docs_scan.md)")
     docs_parser.set_defaults(func=cmd_docs)
 
     args = parser.parse_args()
