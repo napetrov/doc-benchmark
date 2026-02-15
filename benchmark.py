@@ -20,6 +20,7 @@ import sys
 import time
 import urllib.request
 import urllib.parse
+import urllib.error
 from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
@@ -403,15 +404,38 @@ def score_answer(client, question: Question, answer: Answer,
         raw_text = resp.choices[0].message.content.strip()
 
     def _extract_json_object(s: str) -> str:
-        # Handle fenced blocks anywhere
+        """Extract the first top-level JSON object from a free-form LLM response."""
+        # Remove fenced blocks anywhere
         s2 = re.sub(r"```(?:json)?\s*", "", s, flags=re.IGNORECASE)
         s2 = s2.replace("```", "")
-        # Try to locate the first JSON object
+        # Find first balanced {...}
         start = s2.find("{")
-        end = s2.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            return s2[start:end+1].strip()
-        return s2.strip()
+        if start == -1:
+            return s2.strip()
+        depth = 0
+        in_str = False
+        esc = False
+        for i in range(start, len(s2)):
+            ch = s2[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            else:
+                if ch == '"':
+                    in_str = True
+                    continue
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return s2[start:i+1].strip()
+        return s2[start:].strip()
 
     text = _extract_json_object(raw_text)
 
@@ -655,14 +679,34 @@ def cmd_scan(args):
     print(f"🔌 Sources: {', '.join(sources)}")
 
     # Setup clients
-    answer_client = get_client("openai")
-    # Use Deepseek for scoring (Claude has insufficient credits)
-    scorer_client = get_client("deepseek")
+    answer_provider = getattr(args, "answer_provider", "openai")
+    scorer_provider = getattr(args, "scorer_provider", "deepseek")
+
+    answer_client = get_client(answer_provider)
+    scorer_client = get_client(scorer_provider)
 
     answer_model = args.answer_model
     scorer_model = args.scorer_model
-    if "claude" in (args.scorer_model or "").lower():
-        print("⚠ Claude scorer requested but disabled (insufficient credits). Using deepseek-chat.")
+
+    # Basic provider/model sanity checks
+    if scorer_provider == "deepseek" and not (scorer_model or "").startswith("deepseek-"):
+        raise ValueError(
+            f"scorer_provider=deepseek requires a deepseek-* model, got {scorer_model!r}"
+        )
+    if scorer_provider == "openai" and (scorer_model or "").startswith("deepseek-"):
+        raise ValueError(
+            f"scorer_provider=openai cannot use deepseek model {scorer_model!r}"
+        )
+    if scorer_provider == "anthropic" and "claude" not in (scorer_model or "").lower():
+        raise ValueError(
+            f"scorer_provider=anthropic expects a Claude model, got {scorer_model!r}"
+        )
+
+    # Claude can be disabled via env if needed
+    if "claude" in (scorer_model or "").lower() and os.environ.get("DISABLE_CLAUDE", "").lower() in ("1", "true", "yes"):
+        print("⚠ Claude scorer disabled via DISABLE_CLAUDE=1; using deepseek-chat.")
+        scorer_provider = "deepseek"
+        scorer_client = get_client("deepseek")
         scorer_model = "deepseek-chat"
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -806,6 +850,8 @@ def cmd_compare(args):
         lines.append("| Source | Overall/100 | " + " | ".join([f"{d}/20" for d in dims]) + " |")
         lines.append("|---|---:|" + "|".join(["---:"] * len(dims)) + "|")
         per_source_avg = {}
+        if not sources:
+            sources = sorted({s.get("source") for s in scores if s.get("source")})
         for src in sources:
             src_scores = [s for s in scores if s.get("source") == src]
             avg = _avg_scores(src_scores)
@@ -853,9 +899,8 @@ def cmd_compare(args):
     report = "\n".join(lines)
 
     # Write file next to first run if it is a directory, else to CWD.
-    out_dir = Path(args.runs[0]) if args.runs else Path.cwd()
-    if out_dir.is_file():
-        out_dir = Path.cwd()
+    p0 = Path(args.runs[0]) if args.runs else Path.cwd()
+    out_dir = p0 if p0.is_dir() else p0.parent
     out_path = out_dir / "compare.md"
     out_path.write_text(report)
     print(report)
@@ -867,9 +912,19 @@ def cmd_compare(args):
 # ---------------------------------------------------------------------------
 
 def _http_json(url: str, headers: Optional[dict] = None) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "DocBenchmark/1.0", **(headers or {})})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    hdrs = {"User-Agent": "DocBenchmark/1.0", **(headers or {})}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token and "api.github.com" in url and "Authorization" not in hdrs:
+        hdrs["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=hdrs)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="ignore")
+        if e.code == 403 and ("rate limit" in body.lower() or "api rate limit" in body.lower()):
+            raise RuntimeError("GitHub API rate-limited. Set GITHUB_TOKEN env var.")
+        raise
 
 
 def cmd_docs(args):
@@ -925,7 +980,7 @@ def cmd_docs(args):
         lines.append(f"- ... ({len(docs)-50} more)")
 
     report = "\n".join(lines) + "\n"
-    out = Path(args.out) if getattr(args, "out", None) else (RESULTS_DIR / "docs_scan.md")
+    out = Path(args.out) if getattr(args, "out", None) and args.out else (RESULTS_DIR / "docs_scan.md")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report)
     print(report)
@@ -954,8 +1009,16 @@ def main():
         help="Documentation source (baseline, context7:<library_id>, ...)",
     )
     scan_parser.add_argument(
+        "--answer-provider", default="openai", choices=["openai", "deepseek", "anthropic"],
+        help="Provider for answer generation client (default: openai)",
+    )
+    scan_parser.add_argument(
         "--answer-model", default="gpt-4o-mini",
         help="Model for generating answers (default: gpt-4o-mini)",
+    )
+    scan_parser.add_argument(
+        "--scorer-provider", default="deepseek", choices=["openai", "deepseek", "anthropic"],
+        help="Provider for scorer client (default: deepseek)",
     )
     scan_parser.add_argument(
         "--scorer-model", default="deepseek-chat",

@@ -41,6 +41,7 @@ if [ -z "$LATEST_DIR" ]; then
   echo "❌ No results/run_* found after scan" >&2
   exit 3
 fi
+rm -rf results/onedal/baseline
 cp -r "$LATEST_DIR" results/onedal/baseline
 echo "✓ oneDAL baseline complete: results/onedal/baseline"
 
@@ -58,6 +59,7 @@ if [ -z "$LATEST_DIR" ]; then
   echo "❌ No results/run_* found after scan" >&2
   exit 3
 fi
+rm -rf results/onedal/context7
 cp -r "$LATEST_DIR" results/onedal/context7
 echo "✓ oneDAL context7 complete: results/onedal/context7"
 
@@ -75,6 +77,7 @@ if [ -z "$LATEST_DIR" ]; then
   echo "❌ No results/run_* found after scan" >&2
   exit 3
 fi
+rm -rf results/onetbb_full/baseline
 cp -r "$LATEST_DIR" results/onetbb_full/baseline
 echo "✓ oneTBB baseline complete: results/onetbb_full/baseline"
 
@@ -92,6 +95,7 @@ if [ -z "$LATEST_DIR" ]; then
   echo "❌ No results/run_* found after scan" >&2
   exit 3
 fi
+rm -rf results/onetbb_full/context7
 cp -r "$LATEST_DIR" results/onetbb_full/context7
 echo "✓ oneTBB context7 complete: results/onetbb_full/context7"
 
