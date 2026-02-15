@@ -138,6 +138,8 @@ class Score:
     hallucination_notes: str = ""
     scorer_notes: str = ""
     scorer_model: str = ""
+    parse_ok: bool = True
+    raw_scorer_response: str = ""
 
     @property
     def total(self) -> float:
@@ -184,7 +186,11 @@ def get_client(provider: str = "openai"):
 # ---------------------------------------------------------------------------
 
 def fetch_context7(library_id: str, query: str, max_tokens: int = 8000) -> str:
-    """Fetch docs from Context7. Caches responses locally."""
+    """Fetch docs from Context7. Caches responses locally.
+
+    NOTE: Context7 sometimes returns HTML or error text with HTTP 200; we do basic
+    validation and fall back to baseline if content looks wrong.
+    """
     import hashlib
 
     cache_key = hashlib.sha256(f"{library_id}:{query}:{max_tokens}".encode()).hexdigest()
@@ -208,8 +214,11 @@ def fetch_context7(library_id: str, query: str, max_tokens: int = 8000) -> str:
                 text = resp.read().decode("utf-8")
 
             # Validate response
-            if len(text.strip()) < 50:
+            stripped = text.strip()
+            if len(stripped) < 50:
                 print(f"    ⚠ Context7 returned very short response ({len(text)} chars)")
+            if stripped.lower().startswith("<html") or "<body" in stripped.lower():
+                raise ValueError("Context7 returned HTML (likely an error page)")
 
             cache_file.parent.mkdir(parents=True, exist_ok=True)
             cache_file.write_text(text)
@@ -231,6 +240,9 @@ def get_context(source: str, query: str) -> Optional[str]:
         return None
     elif source.startswith("context7:"):
         library_id = source.split(":", 1)[1]
+        # Validate library_id to avoid weird URL/path behavior.
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", library_id or ""):
+            raise ValueError(f"Invalid Context7 library_id: {library_id!r}")
         text = fetch_context7(library_id, query)
         if text.startswith("[FETCH_FAILED"):
             return None
@@ -244,22 +256,30 @@ def get_context(source: str, query: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def generate_answer(client, question: Question, source: str,
-                    model: str = "gpt-4o-mini") -> Answer:
+                    model: str = "gpt-4o-mini", *, context_max_chars: int = 20000) -> Answer:
     """Generate an answer for a question, optionally with doc context."""
     start = time.time()
     context = get_context(source, question.text)
 
+    persona = question.metadata.get("persona")
+    persona_line = f"Persona: {persona}\n" if persona else ""
+
     if context:
+        # Guard against excessive context size.
+        if context_max_chars and len(context) > context_max_chars:
+            context = context[:context_max_chars] + "\n\n[TRUNCATED]"
         system = (
             "You are an expert developer assistant. Answer the question using "
             "the provided documentation. Be specific, include code examples, "
             "and cite specific APIs/functions.\n\n"
+            f"{persona_line}"
             f"Documentation:\n{context}"
         )
     else:
         system = (
             "You are an expert developer assistant. Answer based on your "
-            "training knowledge. Be specific, include code examples."
+            "training knowledge. Be specific, include code examples.\n\n"
+            f"{persona_line}".rstrip()
         )
 
     # Detect client type and use appropriate API
@@ -370,45 +390,70 @@ def score_answer(client, question: Question, answer: Answer,
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=500,
+            max_tokens=700,
         )
-        text = resp.content[0].text
+        raw_text = resp.content[0].text
     else:  # OpenAI-compatible client
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=500,
+            max_tokens=700,
         )
-        text = resp.choices[0].message.content.strip()
+        raw_text = resp.choices[0].message.content.strip()
 
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    def _extract_json_object(s: str) -> str:
+        # Handle fenced blocks anywhere
+        s2 = re.sub(r"```(?:json)?\s*", "", s, flags=re.IGNORECASE)
+        s2 = s2.replace("```", "")
+        # Try to locate the first JSON object
+        start = s2.find("{")
+        end = s2.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return s2[start:end+1].strip()
+        return s2.strip()
 
+    text = _extract_json_object(raw_text)
+
+    parse_ok = True
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
-        print("    ⚠ Failed to parse scorer response, using defaults")
+    except Exception:
+        parse_ok = False
         data = {}
 
-    def _clamp(val, lo=0, hi=20):
-        try:
-            return max(lo, min(hi, int(val)))
-        except (TypeError, ValueError):
+    def _parse_score(val) -> Optional[int]:
+        if val is None:
+            return None
+        if isinstance(val, (int, float)):
+            return int(val)
+        # Accept strings like "18" or "18/20"
+        if isinstance(val, str):
+            m = re.search(r"(\d{1,2})", val)
+            if m:
+                return int(m.group(1))
+        return None
+
+    def _clamp_1_20(val) -> int:
+        v = _parse_score(val)
+        if v is None:
             return 0
+        return max(1, min(20, int(v)))
 
     return Score(
         question_id=answer.question_id,
         source=answer.source,
-        correctness=_clamp(data.get("correctness", 0)),
-        completeness=_clamp(data.get("completeness", 0)),
-        specificity=_clamp(data.get("specificity", 0)),
-        code_quality=_clamp(data.get("code_quality", 0)),
-        actionability=_clamp(data.get("actionability", 0)),
+        correctness=_clamp_1_20(data.get("correctness")),
+        completeness=_clamp_1_20(data.get("completeness")),
+        specificity=_clamp_1_20(data.get("specificity")),
+        code_quality=_clamp_1_20(data.get("code_quality")),
+        actionability=_clamp_1_20(data.get("actionability")),
         doc_gap=data.get("doc_gap", ""),
         hallucination_notes=data.get("hallucination_notes", ""),
         scorer_notes=data.get("scorer_notes", ""),
         scorer_model=model,
+        parse_ok=parse_ok,
+        raw_scorer_response=raw_text,
     )
 
 
@@ -427,13 +472,19 @@ def load_questions(path: Path) -> list[Question]:
             raise ValueError(
                 f"Question entry {i} missing required 'id' or 'text' field"
             )
+        md = dict(q.get("metadata", {}) or {})
+        # Preserve common top-level fields into metadata for downstream prompts/analysis.
+        for k in ("persona", "known_doc_issues"):
+            if k in q and k not in md:
+                md[k] = q[k]
+
         questions.append(Question(
             id=q["id"],
             text=q["text"],
             category=q.get("category", "general"),
             difficulty=q.get("difficulty", "intermediate"),
             expected_topics=q.get("expected_topics", []),
-            metadata=q.get("metadata", {}),
+            metadata=md,
         ))
     return questions
 
@@ -469,18 +520,19 @@ def generate_report(results: dict, output_path: Path):
         lines.append("### Average Scores (out of 20 each)\n")
         lines.append("| Dimension | Score (1-20) | Percentage |")
         lines.append("|-----------|--------------|------------|")
+        parse_ok_vals = [1 for s in source_scores if s.get("parse_ok", True)]
+        parse_ok_rate = (sum(parse_ok_vals) / len(source_scores)) if source_scores else 0
+        lines.append(f"\nJudge parse OK: {parse_ok_rate*100:.0f}% ({sum(parse_ok_vals)}/{len(source_scores)})\n")
+
         for dim in dims:
-            vals = [s[dim] for s in source_scores if s[dim] > 0]
+            vals = [s.get(dim, 0) for s in source_scores]
             avg = sum(vals) / len(vals) if vals else 0
             pct = (avg / 20) * 100
             bar_len = int((avg / 20) * 10)  # 10-char bar
             bar = "█" * bar_len + "░" * (10 - bar_len)
             lines.append(f"| {dim} | {avg:.1f} {bar} | {pct:.0f}% |")
 
-        total_vals = [
-            sum(s[d] for d in dims)
-            for s in source_scores if all(s[d] > 0 for d in dims)
-        ]
+        total_vals = [sum(s.get(d, 0) for d in dims) for s in source_scores]
         overall = sum(total_vals) / len(total_vals) if total_vals else 0
         overall_pct = (overall / 100) * 100
         lines.append(f"\n**Overall: {overall:.1f}/100 ({overall_pct:.0f}%)**\n")
@@ -497,12 +549,11 @@ def generate_report(results: dict, output_path: Path):
             lines.append("|----------|-----------|------------|-----------|")
             for cat in sorted(categories):
                 cat_scores = [
-                    sum(s[d] for d in dims)
+                    sum(s.get(d, 0) for d in dims)
                     for r in results.get("evaluations", [])
                     for s in [r["score"]]
                     if s["source"] == source
                     and r["question"]["category"] == cat
-                    and all(s[d] > 0 for d in dims)
                 ]
                 avg = sum(cat_scores) / len(cat_scores) if cat_scores else 0
                 pct = (avg / 100) * 100
@@ -609,7 +660,10 @@ def cmd_scan(args):
     scorer_client = get_client("deepseek")
 
     answer_model = args.answer_model
-    scorer_model = args.scorer_model if "claude" not in args.scorer_model else "deepseek-chat"
+    scorer_model = args.scorer_model
+    if "claude" in (args.scorer_model or "").lower():
+        print("⚠ Claude scorer requested but disabled (insufficient credits). Using deepseek-chat.")
+        scorer_model = "deepseek-chat"
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_dir = RESULTS_DIR / f"run_{timestamp}"
@@ -628,7 +682,13 @@ def cmd_scan(args):
 
             # Generate answer
             print(f"    Generating answer ({answer_model})...")
-            answer = generate_answer(answer_client, question, source, model=answer_model)
+            answer = generate_answer(
+                answer_client,
+                question,
+                source,
+                model=answer_model,
+                context_max_chars=getattr(args, "context_max_chars", 20000),
+            )
 
             # Score answer
             print(f"    Scoring ({scorer_model})...")
@@ -736,6 +796,10 @@ def main():
     scan_parser.add_argument(
         "--scorer-model", default="deepseek-chat",
         help="Model for scoring answers (default: deepseek-chat)",
+    )
+    scan_parser.add_argument(
+        "--context-max-chars", type=int, default=20000,
+        help="Max documentation context chars to inject (default: 20000)",
     )
     scan_parser.set_defaults(func=cmd_scan)
 

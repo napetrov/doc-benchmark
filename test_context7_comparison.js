@@ -67,7 +67,8 @@ async function fetchViaMCP(library_id, query) {
     // Create MCP client
     const transport = new StdioClientTransport({
       command: 'npx',
-      args: ['-y', '@upstash/context7-mcp']
+      // Pin version to avoid executing unpinned remote code.
+      args: ['-y', '@upstash/context7-mcp@2.1.1']
     });
     
     const client = new Client({
