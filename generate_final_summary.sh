@@ -1,15 +1,17 @@
 #!/bin/bash
 # Generate final comparison summary for oneDAL and oneTBB benchmarks
 
-set -e
-cd /home/openclaw/.openclaw/workspace/projects/intel/intel-doc-benchmark
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_ROOT"
 
 echo "=========================================="
 echo "Generating Final Summary"
 echo "=========================================="
 
 # Create final summary document
-cat > FINAL_RESULTS.md << 'EOF'
+cat > FINAL_RESULTS.md << EOF
 # Intel Documentation Benchmark - Final Results
 
 ## Executive Summary
