@@ -8,7 +8,8 @@ Usage:
     python benchmark.py scan -q questions/onetbb.json --source context7:uxlfoundation/onetbb
     python benchmark.py scan -q questions/onetbb.json --source baseline
     python benchmark.py scan -q questions/onetbb.json --source context7:uxlfoundation/onetbb --source baseline
-    python benchmark.py compare results/run_*.json
+    python benchmark.py compare results/run_20260215_123456
+    python benchmark.py compare results/run_20260215_123456/results.json
     python benchmark.py docs --repo uxlfoundation/oneTBB
 """
 
@@ -1081,7 +1082,7 @@ def main():
 
     # compare
     compare_parser = subparsers.add_parser("compare", help="Compare runs")
-    compare_parser.add_argument("runs", nargs="+", help="Result JSON files")
+    compare_parser.add_argument("runs", nargs="+", help="Run directories or results.json paths")
     compare_parser.set_defaults(func=cmd_compare)
 
     # docs
