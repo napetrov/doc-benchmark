@@ -1,3 +1,5 @@
+"""Readability scoring helpers."""
+
 from __future__ import annotations
 
 import re
@@ -6,25 +8,29 @@ import re
 SENTENCE_RE = re.compile(r"[.!?]+")
 WORD_RE = re.compile(r"[A-Za-zА-Яа-я0-9'-]+")
 VOWELS = set("aeiouyаеёиоуыэюяAEIOUYАЕЁИОУЫЭЮЯ")
+CODE_BLOCK_RE = re.compile(r"```.*?```", re.S)
+INLINE_CODE_RE = re.compile(r"`[^`]+`")
 
 
 def _syllables(word: str) -> int:
+    """Approximate syllables by counting vowels."""
     count = sum(1 for ch in word if ch in VOWELS)
     return max(1, count)
 
 
 def score(text: str, grade_max: float = 12.0) -> float:
-    words = WORD_RE.findall(text)
+    """Return inverse FK grade score in [0, 1] where higher is better."""
+    cleaned = CODE_BLOCK_RE.sub(" ", text)
+    cleaned = INLINE_CODE_RE.sub(" ", cleaned)
+
+    words = WORD_RE.findall(cleaned)
     n_words = len(words)
     if n_words == 0:
         return 0.0
-    n_sentences = max(1, len(SENTENCE_RE.findall(text)))
+    n_sentences = max(1, len(SENTENCE_RE.findall(cleaned)))
     n_syllables = sum(_syllables(w) for w in words)
 
-    # Approx Flesch-Kincaid Grade Level
     grade = 0.39 * (n_words / n_sentences) + 11.8 * (n_syllables / n_words) - 15.59
-
-    # Lower grade is better up to grade_max
     if grade <= 0:
         return 1.0
     if grade >= grade_max:

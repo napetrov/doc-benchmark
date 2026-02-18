@@ -1,3 +1,5 @@
+"""Coverage scoring heuristic for markdown docs."""
+
 from __future__ import annotations
 
 import re
@@ -8,6 +10,7 @@ CODE_BLOCK_RE = re.compile(r"```", re.MULTILINE)
 
 
 def score(text: str) -> float:
+    """Return simple structure/body coverage score in [0, 1]."""
     if not text.strip():
         return 0.0
     headings = len(HEADING_RE.findall(text))

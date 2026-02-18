@@ -1,10 +1,12 @@
+"""Benchmark run orchestration."""
+
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-import subprocess
+import yaml
 
 from doc_benchmarks.ingest.chunker import chunk_text
 from doc_benchmarks.ingest.loader import discover_markdown, load_docs
@@ -13,6 +15,8 @@ from doc_benchmarks.metrics import coverage, freshness_lite, readability
 
 @dataclass
 class DocMetrics:
+    """Per-document metric bundle."""
+
     path: str
     chunks: int
     coverage: float
@@ -22,6 +26,7 @@ class DocMetrics:
 
 
 def _weighted_score(doc: dict, weights: dict[str, float]) -> float:
+    """Compute weighted score from metric values."""
     return round(
         doc["coverage"] * weights["coverage"]
         + doc["freshness_lite"] * weights["freshness_lite"]
@@ -31,21 +36,24 @@ def _weighted_score(doc: dict, weights: dict[str, float]) -> float:
 
 
 def _load_spec(spec_path: Path) -> dict:
+    """Load benchmark spec YAML with explicit, descriptive failures."""
     try:
-        import yaml  # type: ignore
+        content = spec_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"Failed to read spec file: {spec_path}: {exc}") from exc
 
-        return yaml.safe_load(spec_path.read_text(encoding="utf-8"))
-    except Exception:
-        proc = subprocess.run(
-            ["yq", "eval", "-o=json", str(spec_path)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return json.loads(proc.stdout)
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"Invalid YAML in spec file: {spec_path}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Spec root must be a mapping/object: {spec_path}")
+    return data
 
 
 def run_benchmark(root: Path, spec_path: Path) -> dict:
+    """Run benchmark on markdown docs and return snapshot payload."""
     spec = _load_spec(spec_path)
     weights = spec["weights"]
 
@@ -83,5 +91,6 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
 
 
 def save_snapshot(data: dict, out_path: Path) -> None:
+    """Persist run snapshot to JSON file."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
