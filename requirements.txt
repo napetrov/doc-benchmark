@@ -3,3 +3,4 @@ datasets
 openai
 anthropic
 python-pptx
+PyYAML>=6.0.1
