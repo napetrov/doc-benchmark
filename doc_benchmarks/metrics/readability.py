@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 
+# Latin + Cyrillic are intentional here for multilingual readability scoring (RUF001-safe).
 SENTENCE_RE = re.compile(r"[.!?]+")
 WORD_RE = re.compile(r"[A-Za-zА-Яа-я0-9'-]+")
 VOWELS = set("aeiouyаеёиоуыэюяAEIOUYАЕЁИОУЫЭЮЯ")
@@ -20,6 +21,9 @@ def _syllables(word: str) -> int:
 
 def score(text: str, grade_max: float = 12.0) -> float:
     """Return inverse FK grade score in [0, 1] where higher is better."""
+    if grade_max <= 0:
+        raise ValueError("grade_max must be > 0")
+
     cleaned = CODE_BLOCK_RE.sub(" ", text)
     cleaned = INLINE_CODE_RE.sub(" ", cleaned)
 

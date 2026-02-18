@@ -49,6 +49,22 @@ def _load_spec(spec_path: Path) -> dict:
 
     if not isinstance(data, dict):
         raise RuntimeError(f"Spec root must be a mapping/object: {spec_path}")
+
+    missing: list[str] = []
+    if "weights" not in data:
+        missing.append("weights")
+    if "metrics" not in data or not isinstance(data.get("metrics"), dict):
+        missing.append("metrics")
+    else:
+        metrics = data["metrics"]
+        if "freshness_lite" not in metrics or "max_age_days" not in metrics.get("freshness_lite", {}):
+            missing.append("metrics.freshness_lite.max_age_days")
+        if "readability" not in metrics or "grade_max" not in metrics.get("readability", {}):
+            missing.append("metrics.readability.grade_max")
+
+    if missing:
+        raise RuntimeError(f"Spec missing required fields ({', '.join(missing)}): {spec_path}")
+
     return data
 
 
