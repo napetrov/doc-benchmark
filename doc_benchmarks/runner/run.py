@@ -138,14 +138,16 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
             ]
         docs_out.append(d)
 
+    gate_result = check_soft_gate({"score": total_score}, spec)
+
     return {
         "summary": {"docs": len(rows), "score": total_score, **agg},
         "docs": docs_out,
         "gate": {
             "soft": {
-                "enabled": check_soft_gate({"score": total_score}, spec).enabled,
-                "passed": check_soft_gate({"score": total_score}, spec).passed,
-                "min_score": check_soft_gate({"score": total_score}, spec).min_score,
+                "enabled": gate_result.enabled,
+                "passed": gate_result.passed,
+                "min_score": gate_result.min_score,
             }
         },
     }

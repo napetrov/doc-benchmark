@@ -37,7 +37,7 @@ def compare_snapshots(base_path: Path, cand_path: Path, spec: dict | None = None
         "freshness_lite": round(cand["summary"]["freshness_lite"] - base["summary"]["freshness_lite"], 4),
         "readability": round(cand["summary"]["readability"] - base["summary"]["readability"], 4),
     }
-    
+
     # Include example_pass_rate diff if both snapshots have it
     if "example_pass_rate" in base["summary"] and "example_pass_rate" in cand["summary"]:
         diff["example_pass_rate"] = round(
@@ -47,8 +47,9 @@ def compare_snapshots(base_path: Path, cand_path: Path, spec: dict | None = None
     result = {"base": base["summary"], "candidate": cand["summary"], "diff": diff}
 
     # Add regression analysis if spec provided
-    if spec:
-        from doc_benchmarks.gate.regression import detect_regressions
+    if spec is not None:
+        if not isinstance(spec, dict):
+            raise ValueError("spec must be a dict (mapping)")
         regressions = detect_regressions(diff, spec)
         result["regressions"] = {
             "score": {
