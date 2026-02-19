@@ -31,10 +31,11 @@ def extract_examples(markdown: str) -> list[tuple[str, str]]:
     """Extract fenced code blocks with language tags from markdown.
 
     Supports optional metadata after language tag (e.g. ```python title="x.py").
+    Normalizes language tags to lowercase.
     Returns list of (language, code) tuples.
     """
     pattern = re.compile(r"```(\w+)[^\n]*\n(.*?)```", re.DOTALL)
-    return [(m.group(1), m.group(2).strip()) for m in pattern.finditer(markdown)]
+    return [(m.group(1).lower(), m.group(2).strip()) for m in pattern.finditer(markdown)]
 
 
 def run_example(lang: str, code: str, timeout: int = 5) -> tuple[bool, str | None]:
