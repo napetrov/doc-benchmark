@@ -12,6 +12,7 @@ from doc_benchmarks.ingest.chunker import chunk_text
 from doc_benchmarks.ingest.loader import discover_markdown, load_docs
 from doc_benchmarks.metrics import coverage, freshness_lite, readability
 from doc_benchmarks.metrics.example_runner import ExampleResult, score_examples
+from doc_benchmarks.gate.soft_gate import check_soft_gate
 
 
 @dataclass
@@ -140,6 +141,13 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
     return {
         "summary": {"docs": len(rows), "score": total_score, **agg},
         "docs": docs_out,
+        "gate": {
+            "soft": {
+                "enabled": check_soft_gate({"score": total_score}, spec).enabled,
+                "passed": check_soft_gate({"score": total_score}, spec).passed,
+                "min_score": check_soft_gate({"score": total_score}, spec).min_score,
+            }
+        },
     }
 
 
