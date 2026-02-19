@@ -21,10 +21,6 @@ def cmd_run(args: argparse.Namespace) -> None:
     out_json = Path(args.out_json).resolve()
     out_md = Path(args.out_md).resolve()
 
-    # Load spec for gate checks
-    import yaml
-    spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
-
     result = run_benchmark(root, spec_path)
     save_snapshot(result, out_json)
     write_run_report(result, out_md)
@@ -32,6 +28,14 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     # Strict mode: check hard gate and critical bands
     if args.strict:
+        # Re-load spec for gate checks (run_benchmark loads internally)
+        import yaml
+        spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+        if spec is None:
+            spec = {}
+        elif not isinstance(spec, dict):
+            raise ValueError("Spec must be a YAML mapping/dict")
+
         from doc_benchmarks.gate.hard_gate import check_hard_gate
         from doc_benchmarks.gate.critical_bands import check_critical_bands
 

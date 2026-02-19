@@ -37,15 +37,25 @@ def check_critical_bands(summary: dict, spec: dict) -> CriticalBandsResult:
     """Check if summary violates any critical bands.
     
     Returns CriticalBandsResult. Caller decides whether to exit.
+    Raises ValueError on unknown conditions (fail-fast on spec typos).
     """
     bands = spec.get("critical_bands", {}).get("fail_on", [])
     if not bands:
         return CriticalBandsResult(enabled=False, violations=[])
 
     violations: list[BandViolation] = []
+    known_conditions = {"score_below", "coverage_below", "freshness_below", "readability_below"}
 
     for band in bands:
+        if not isinstance(band, dict):
+            raise ValueError("critical_bands.fail_on entries must be mappings/dicts")
+
         condition = band.get("condition", "")
+        if not condition:
+            raise ValueError("critical_bands.fail_on entry missing 'condition' key")
+        if condition not in known_conditions:
+            raise ValueError(f"Unknown critical_bands condition: {condition} (known: {', '.join(sorted(known_conditions))})")
+
         threshold = float(band.get("value", 0.0))
 
         if condition == "score_below":
