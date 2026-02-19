@@ -11,6 +11,7 @@ import yaml
 from doc_benchmarks.ingest.chunker import chunk_text
 from doc_benchmarks.ingest.loader import discover_markdown, load_docs
 from doc_benchmarks.metrics import coverage, freshness_lite, readability
+from doc_benchmarks.metrics.example_runner import score_examples
 
 
 @dataclass
@@ -22,17 +23,20 @@ class DocMetrics:
     coverage: float
     freshness_lite: float
     readability: float
+    example_pass_rate: float
     score: float
 
 
-def _weighted_score(doc: dict, weights: dict[str, float]) -> float:
+def _weighted_score(doc: dict, weights: dict[str, float], example_enabled: bool) -> float:
     """Compute weighted score from metric values."""
-    return round(
+    base = (
         doc["coverage"] * weights["coverage"]
         + doc["freshness_lite"] * weights["freshness_lite"]
-        + doc["readability"] * weights["readability"],
-        4,
+        + doc["readability"] * weights["readability"]
     )
+    if example_enabled:
+        base += doc["example_pass_rate"] * weights["example_pass_rate"]
+    return round(base, 4)
 
 
 def _load_spec(spec_path: Path) -> dict:
@@ -72,6 +76,7 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
     """Run benchmark on markdown docs and return snapshot payload."""
     spec = _load_spec(spec_path)
     weights = spec["weights"]
+    example_enabled = spec["metrics"].get("example_pass_rate", {}).get("enabled", False)
 
     docs = discover_markdown(root / "docs")
     loaded = load_docs(docs)
@@ -86,7 +91,14 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
             "freshness_lite": freshness_lite.score(p, spec["metrics"]["freshness_lite"]["max_age_days"]),
             "readability": readability.score(text, spec["metrics"]["readability"]["grade_max"]),
         }
-        row["score"] = _weighted_score(row, weights)
+        
+        if example_enabled:
+            example_score, _ = score_examples(p)
+            row["example_pass_rate"] = example_score
+        else:
+            row["example_pass_rate"] = 0.0
+        
+        row["score"] = _weighted_score(row, weights, example_enabled)
         results.append(DocMetrics(**row))
 
     agg = {
@@ -94,6 +106,10 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
         "freshness_lite": round(sum(r.freshness_lite for r in results) / max(1, len(results)), 4),
         "readability": round(sum(r.readability for r in results) / max(1, len(results)), 4),
     }
+    
+    if example_enabled:
+        agg["example_pass_rate"] = round(sum(r.example_pass_rate for r in results) / max(1, len(results)), 4)
+    
     total_score = round(sum(r.score for r in results) / max(1, len(results)), 4)
 
     return {
