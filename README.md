@@ -54,7 +54,7 @@ python cli.py run --root . --spec benchmarks/spec.v1.yaml \
 
 ---
 
-### 2. Freshness (weight 0.25)
+### 2. Freshness (`freshness_lite`) (weight 0.25)
 **What:** File modification age-based scoring  
 **Scorer:** Linear decay from 1.0 (fresh) to 0.0 (stale)  
 **Config:** `max_age_days` (default 365) in spec
@@ -169,7 +169,7 @@ python cli.py run --spec benchmarks/spec.v1.yaml --strict
 **Supported conditions:**
 - `score_below`
 - `coverage_below`
-- `freshness_below`
+- `freshness_below` (checks `freshness_lite` metric)
 - `readability_below`
 
 **Config:**
@@ -388,7 +388,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install PyYAML
+        run: pip install -r requirements.txt
       - name: Run benchmark
         run: |
           python cli.py run --root . --spec benchmarks/spec.v1.yaml \
