@@ -108,10 +108,11 @@ def test_regression_improvement():
 
 
 def test_regression_missing_thresholds():
-    """Missing thresholds → use defaults (0)."""
+    """Missing thresholds → use defaults (0.03 warn, 0.08 critical)."""
     spec = {}
+    # -0.01 drop < 0.03 default warn threshold → OK
     diff = {"score": -0.01, "coverage": 0.00, "freshness_lite": 0.00, "readability": 0.00}
     
     result = detect_regressions(diff, spec)
     
-    assert result.score_regression.severity == "WARN"  # Any drop > 0 = WARN with default
+    assert result.score_regression.severity == "OK"  # -0.01 < 0.03 warn threshold
