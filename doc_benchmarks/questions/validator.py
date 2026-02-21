@@ -213,13 +213,14 @@ class QuestionValidator:
         # Find duplicate groups (similarity > threshold)
         unique_indices = []
         duplicate_groups = []
+        persona_merge_map = {}  # best_idx -> list of all similar indices
         seen = set()
         
         for i in range(len(questions)):
             if i in seen:
                 continue
             
-            # Find all questions similar to i
+            # Find all questions similar to i (including i itself)
             similar = [j for j in range(i, len(questions))
                       if similarity[i, j] > self.similarity_threshold and j not in seen]
             
@@ -229,27 +230,28 @@ class QuestionValidator:
                 # Keep the most specific (longest text as heuristic)
                 best_idx = max(similar, key=lambda j: len(questions[j]["text"]))
                 unique_indices.append(best_idx)
+                persona_merge_map[best_idx] = similar  # Save for merging later
                 seen.update(similar)
             else:
                 unique_indices.append(i)
                 seen.add(i)
         
+        # Build unique questions list
         unique_questions = [questions[i] for i in sorted(unique_indices)]
         
         # Merge persona lists for kept questions from duplicate groups
-        for group in duplicate_groups:
-            if len(group) > 1:
-                kept_text = max(group, key=len)  # Most specific
-                kept_q = next(q for q in unique_questions if q["text"] == kept_text)
-                
-                # Merge personas from all duplicates
-                all_personas = set(kept_q["personas"])
-                for text in group:
-                    original = next((q for q in questions if q["text"] == text), None)
-                    if original:
-                        all_personas.update(original["personas"])
-                
-                kept_q["personas"] = list(all_personas)
+        for kept_idx, similar_indices in persona_merge_map.items():
+            kept_q = questions[kept_idx]
+            # Merge personas from all duplicates
+            all_personas = set(kept_q.get("personas", []))
+            for j in similar_indices:
+                all_personas.update(questions[j].get("personas", []))
+            
+            # Update in unique_questions
+            for q in unique_questions:
+                if q.get("id") == kept_q.get("id") or q.get("text") == kept_q.get("text"):
+                    q["personas"] = list(all_personas)
+                    break
         
         return unique_questions, duplicate_groups
     
