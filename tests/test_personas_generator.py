@@ -1,10 +1,20 @@
 """Tests for PersonaGenerator."""
 
+import sys
+import types
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 import json
 from datetime import datetime
+
+# Provide mock langchain modules if not installed
+for mod_name in ['langchain_openai', 'langchain_anthropic']:
+    if mod_name not in sys.modules:
+        mock_mod = types.ModuleType(mod_name)
+        mock_mod.ChatOpenAI = Mock
+        mock_mod.ChatAnthropic = Mock
+        sys.modules[mod_name] = mock_mod
 
 from doc_benchmarks.personas.generator import PersonaGenerator, PERSONA_GENERATION_PROMPT
 
@@ -82,55 +92,54 @@ def sample_llm_response():
 class TestPersonaGenerator:
     """Test suite for PersonaGenerator."""
     
-    @patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True)
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_init_openai(self, mock_chat_openai):
+    def test_init_openai(self):
         """Test initialization with OpenAI provider."""
-        generator = PersonaGenerator(model="gpt-4o-mini", provider="openai")
-        
-        assert generator.model == "gpt-4o-mini"
-        assert generator.provider == "openai"
-        mock_chat_openai.assert_called_once_with(model="gpt-4o-mini", api_key=None)
+        mock_cls = Mock()
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator(model="gpt-4o-mini", provider="openai")
+            assert generator.model == "gpt-4o-mini"
+            assert generator.provider == "openai"
+            mock_cls.assert_called_once_with(model="gpt-4o-mini", api_key=None)
     
-    @patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True)
-    @patch('doc_benchmarks.personas.generator.ChatAnthropic')
-    def test_init_anthropic(self, mock_chat_anthropic):
+    def test_init_anthropic(self):
         """Test initialization with Anthropic provider."""
-        generator = PersonaGenerator(model="claude-haiku", provider="anthropic", api_key="test-key")
-        
-        assert generator.model == "claude-haiku"
-        assert generator.provider == "anthropic"
-        mock_chat_anthropic.assert_called_once_with(model="claude-haiku", api_key="test-key")
+        mock_cls = Mock()
+        with patch('doc_benchmarks.personas.generator.ChatAnthropic', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator(model="claude-haiku", provider="anthropic", api_key="test-key")
+            assert generator.model == "claude-haiku"
+            assert generator.provider == "anthropic"
+            mock_cls.assert_called_once_with(model="claude-haiku", api_key="test-key")
     
-    @patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True)
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_init_unsupported_provider(self, mock_chat_openai):
+    def test_init_unsupported_provider(self):
         """Test initialization with unsupported provider."""
-        with pytest.raises(ValueError) as exc_info:
-            PersonaGenerator(provider="unsupported")
-        
-        assert "Unsupported provider" in str(exc_info.value)
+        mock_cls = Mock()
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            with pytest.raises(ValueError) as exc_info:
+                PersonaGenerator(provider="unsupported")
+            assert "Unsupported provider" in str(exc_info.value)
     
-    @patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', False)
     def test_init_langchain_unavailable(self):
         """Test initialization when langchain is not available."""
-        with pytest.raises(ImportError) as exc_info:
-            PersonaGenerator()
-        
-        assert "langchain not available" in str(exc_info.value)
+        with patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', False):
+            with pytest.raises(ImportError) as exc_info:
+                PersonaGenerator()
+            assert "langchain not available" in str(exc_info.value)
     
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_generate_personas_success(self, mock_chat_openai, sample_analysis, sample_llm_response):
+    def test_generate_personas_success(self, sample_analysis, sample_llm_response):
         """Test successful persona generation."""
-        # Mock LLM response
         mock_llm = Mock()
         mock_response = Mock()
         mock_response.content = json.dumps(sample_llm_response)
         mock_llm.invoke.return_value = mock_response
-        mock_chat_openai.return_value = mock_llm
+        mock_cls = Mock(return_value=mock_llm)
         
-        generator = PersonaGenerator(model="gpt-4o-mini")
-        result = generator.generate_personas("oneTBB", sample_analysis, target_count=5)
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator(model="gpt-4o-mini")
+            result = generator.generate_personas("oneTBB", sample_analysis, target_count=5)
         
         # Verify structure
         assert "product" in result
@@ -151,81 +160,66 @@ class TestPersonaGenerator:
         assert "concerns" in personas[0]
         assert "typical_questions" in personas[0]
     
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_generate_personas_clamps_count(self, mock_chat_openai, sample_analysis, sample_llm_response):
+    def test_generate_personas_clamps_count(self, sample_analysis, sample_llm_response):
         """Test that persona count is clamped to 5-8 range."""
         mock_llm = Mock()
         mock_response = Mock()
         mock_response.content = json.dumps(sample_llm_response)
         mock_llm.invoke.return_value = mock_response
-        mock_chat_openai.return_value = mock_llm
+        mock_cls = Mock(return_value=mock_llm)
         
-        generator = PersonaGenerator()
-        
-        # Test too low
-        result = generator.generate_personas("oneTBB", sample_analysis, target_count=2)
-        # Should work (count is just a target, LLM returns what it returns)
-        
-        # Test too high
-        result = generator.generate_personas("oneTBB", sample_analysis, target_count=20)
-        # Should work (clamped internally)
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator()
+            generator.generate_personas("oneTBB", sample_analysis, target_count=2)
+            generator.generate_personas("oneTBB", sample_analysis, target_count=20)
     
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_generate_personas_invalid_json(self, mock_chat_openai, sample_analysis):
+    def test_generate_personas_invalid_json(self, sample_analysis):
         """Test handling of invalid JSON response from LLM."""
         mock_llm = Mock()
         mock_response = Mock()
         mock_response.content = "This is not JSON"
         mock_llm.invoke.return_value = mock_response
-        mock_chat_openai.return_value = mock_llm
+        mock_cls = Mock(return_value=mock_llm)
         
-        generator = PersonaGenerator()
-        
-        with pytest.raises(json.JSONDecodeError):
-            generator.generate_personas("oneTBB", sample_analysis)
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator()
+            with pytest.raises(json.JSONDecodeError):
+                generator.generate_personas("oneTBB", sample_analysis)
     
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_generate_personas_missing_key(self, mock_chat_openai, sample_analysis):
+    def test_generate_personas_missing_key(self, sample_analysis):
         """Test handling of response missing 'personas' key."""
         mock_llm = Mock()
         mock_response = Mock()
         mock_response.content = json.dumps({"wrong_key": []})
         mock_llm.invoke.return_value = mock_response
-        mock_chat_openai.return_value = mock_llm
+        mock_cls = Mock(return_value=mock_llm)
         
-        generator = PersonaGenerator()
-        
-        with pytest.raises(ValueError) as exc_info:
-            generator.generate_personas("oneTBB", sample_analysis)
-        
-        assert "missing 'personas' key" in str(exc_info.value)
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator()
+            with pytest.raises(ValueError) as exc_info:
+                generator.generate_personas("oneTBB", sample_analysis)
+            assert "missing 'personas' key" in str(exc_info.value)
     
-    @patch('doc_benchmarks.personas.generator.ChatOpenAI')
-    def test_generate_personas_invalid_structure(self, mock_chat_openai, sample_analysis):
+    def test_generate_personas_invalid_structure(self, sample_analysis):
         """Test handling of persona with missing required fields."""
         mock_llm = Mock()
         mock_response = Mock()
-        # Persona missing 'skill_level'
         invalid_response = {
-            "personas": [
-                {
-                    "id": "test",
-                    "name": "Test",
-                    "description": "Test persona"
-                    # Missing: skill_level, concerns, typical_questions
-                }
-            ]
+            "personas": [{"id": "test", "name": "Test", "description": "Test persona"}]
         }
         mock_response.content = json.dumps(invalid_response)
         mock_llm.invoke.return_value = mock_response
-        mock_chat_openai.return_value = mock_llm
+        mock_cls = Mock(return_value=mock_llm)
         
-        generator = PersonaGenerator()
-        
-        with pytest.raises(ValueError) as exc_info:
-            generator.generate_personas("oneTBB", sample_analysis)
-        
-        assert "missing required fields" in str(exc_info.value)
+        with patch('doc_benchmarks.personas.generator.ChatOpenAI', mock_cls, create=True), \
+             patch('doc_benchmarks.personas.generator.LANGCHAIN_AVAILABLE', True):
+            generator = PersonaGenerator()
+            with pytest.raises(ValueError) as exc_info:
+                generator.generate_personas("oneTBB", sample_analysis)
+            assert "missing required fields" in str(exc_info.value)
     
     def test_summarize_readme(self):
         """Test README summarization."""
