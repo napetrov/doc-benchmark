@@ -167,7 +167,7 @@ class TestValidateAndDedupe:
         resp.data = [
             type('obj', (), {'embedding': [1.0] + [0.0]*383}),  # q_001
             type('obj', (), {'embedding': [0.0, 1.0] + [0.0]*382}),  # q_002 (different)
-            type('obj', (), {'embedding': [0.95] + [0.05]*383})  # q_003 (similar to q_001)
+            type('obj', (), {'embedding': [0.99] + [0.0]*383})  # q_003 (very similar to q_001)
         ]
         mock_embeddings.embeddings.create.return_value = resp
         
