@@ -272,7 +272,10 @@ def cmd_answers_generate(args: argparse.Namespace) -> None:
     answerer = Answerer(
         mcp_client=mcp_client,
         model=args.model,
-        provider=args.provider
+        provider=args.provider,
+        top_k=args.top_k,
+        rerank_threshold=args.rerank_threshold,
+        debug_retrieval=args.debug_retrieval
     )
     
     answers = answerer.generate_answers(
@@ -419,6 +422,9 @@ def build_parser() -> argparse.ArgumentParser:
     gen_a_p.add_argument("--model", default="gpt-4o", help="LLM model for answering")
     gen_a_p.add_argument("--provider", default="openai", choices=["openai", "anthropic"])
     gen_a_p.add_argument("--max-tokens", type=int, default=4000, help="Max tokens to retrieve per question")
+    gen_a_p.add_argument("--top-k", type=int, default=5, help="Number of docs to retrieve before reranking")
+    gen_a_p.add_argument("--rerank-threshold", type=float, default=0.3, help="Min relevance score (0-1) to keep docs")
+    gen_a_p.add_argument("--debug-retrieval", action="store_true", help="Include retrieval metadata in output")
     gen_a_p.set_defaults(func=cmd_answers_generate)
     
     # Eval subcommand group
