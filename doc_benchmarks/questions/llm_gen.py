@@ -7,12 +7,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-try:
-    from langchain_openai import ChatOpenAI
-    from langchain_anthropic import ChatAnthropic
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    LANGCHAIN_AVAILABLE = False
+from doc_benchmarks.llm import llm_call
 
 
 QUESTION_GENERATION_PROMPT = """You are generating technical questions for documentation quality evaluation.
@@ -58,21 +53,8 @@ class QuestionGenerator:
             provider: "openai" or "anthropic"
             api_key: Optional API key (uses env var if not provided)
         """
-        if not LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "langchain not available. "
-                "Install: pip install langchain-openai langchain-anthropic"
-            )
-        
         self.model = model
         self.provider = provider
-        
-        if provider == "openai":
-            self.llm = ChatOpenAI(model=model, api_key=api_key)
-        elif provider == "anthropic":
-            self.llm = ChatAnthropic(model=model, api_key=api_key)
-        else:
-            raise ValueError(f"Unsupported provider: {provider}")
         
         logger.info(f"QuestionGenerator initialized: {provider}/{model}")
     
@@ -205,8 +187,7 @@ class QuestionGenerator:
             count=count
         )
         
-        response = self.llm.invoke(prompt)
-        raw = response.content if hasattr(response, "content") else str(response)
+        raw = llm_call(prompt, self.model, self.provider)
         
         # Parse JSON array
         start = raw.find("[")

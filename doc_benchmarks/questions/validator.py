@@ -12,12 +12,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-try:
-    from langchain_openai import ChatOpenAI
-    from langchain_anthropic import ChatAnthropic
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    LANGCHAIN_AVAILABLE = False
+from doc_benchmarks.llm import llm_call
 
 
 VALIDATION_PROMPT = """You are validating a technical question for documentation quality evaluation.
@@ -71,17 +66,7 @@ class QuestionValidator:
         self.threshold = threshold
         self.similarity_threshold = similarity_threshold
         
-        # Init LLM for validation
-        if LANGCHAIN_AVAILABLE:
-            if llm_provider == "openai":
-                self.llm = ChatOpenAI(model=llm_model, api_key=api_key)
-            elif llm_provider == "anthropic":
-                self.llm = ChatAnthropic(model=llm_model, api_key=api_key)
-            else:
-                raise ValueError(f"Unsupported LLM provider: {llm_provider}")
-        else:
-            self.llm = None
-            logger.warning("LangChain not available — validation disabled")
+        # llm_call used directly in _validate_question
         
         # Init OpenAI client for embeddings
         if OPENAI_AVAILABLE:
@@ -141,15 +126,7 @@ class QuestionValidator:
     
     def _validate_question(self, library_name: str, question_text: str) -> Optional[Dict[str, Any]]:
         """Validate a single question using LLM."""
-        if self.llm is None:
-            # No validation available — pass through
-            return {
-                "relevance": 100,
-                "answerability": 100,
-                "specificity": 100,
-                "aggregate": 100,
-                "reasoning": "Validation disabled (no LLM)"
-            }
+
         
         try:
             prompt = VALIDATION_PROMPT.format(
@@ -157,8 +134,7 @@ class QuestionValidator:
                 question=question_text
             )
             
-            response = self.llm.invoke(prompt)
-            raw = response.content if hasattr(response, "content") else str(response)
+            raw = llm_call(prompt, self.llm_model, self.llm_provider)
             
             # Parse JSON
             start = raw.find("{")

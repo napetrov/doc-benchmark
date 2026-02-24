@@ -7,12 +7,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-try:
-    from langchain_openai import ChatOpenAI
-    from langchain_anthropic import ChatAnthropic
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    LANGCHAIN_AVAILABLE = False
+from doc_benchmarks.llm import llm_call
 
 from .reranker import SimpleReranker
 
@@ -69,12 +64,6 @@ class Answerer:
             rerank_threshold: Minimum relevance score (0-1) to keep docs
             debug_retrieval: If True, include detailed retrieval metadata in output
         """
-        if not LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "langchain not available. "
-                "Install: pip install langchain-openai langchain-anthropic"
-            )
-        
         self.mcp_client = mcp_client
         self.model = model
         self.provider = provider
@@ -84,37 +73,6 @@ class Answerer:
         # Initialize reranker
         self.reranker = SimpleReranker(threshold=rerank_threshold)
         logger.info(f"Reranker initialized with threshold={rerank_threshold:.2f}")
-        
-        # If api_key not provided, check environment
-        if not api_key:
-            import os
-            if provider == "openai":
-                api_key = os.getenv("OPENAI_API_KEY")
-            elif provider == "anthropic":
-                api_key = os.getenv("ANTHROPIC_API_KEY")
-        
-        # Check for OpenRouter API key (starts with sk-or-)
-        openrouter_base = None
-        if api_key and api_key.startswith("sk-or-"):
-            openrouter_base = "https://openrouter.ai/api/v1"
-            logger.info("Detected OpenRouter API key, using openrouter.ai endpoint")
-        
-        if provider == "openai":
-            if api_key:
-                self.llm = ChatOpenAI(
-                    model=model, 
-                    api_key=api_key,
-                    base_url=openrouter_base
-                )
-            else:
-                self.llm = ChatOpenAI(model=model)
-        elif provider == "anthropic":
-            if api_key:
-                self.llm = ChatAnthropic(model=model, api_key=api_key)
-            else:
-                self.llm = ChatAnthropic(model=model)
-        else:
-            raise ValueError(f"Unsupported provider: {provider}")
         
         logger.info(f"Answerer initialized: {provider}/{model}, MCP={'yes' if mcp_client else 'no'}")
     
@@ -313,8 +271,7 @@ class Answerer:
             docs=docs_text[:15000]  # Limit to avoid token overflow
         )
         
-        response = self.llm.invoke(prompt)
-        answer_text = response.content if hasattr(response, "content") else str(response)
+        answer_text = llm_call(prompt, self.model, self.provider)
         
         result = {
             "answer": answer_text,
@@ -340,8 +297,7 @@ class Answerer:
         """Generate answer WITHOUT documentation (baseline)."""
         prompt = ANSWER_PROMPT_WITHOUT_DOCS.format(question=question)
         
-        response = self.llm.invoke(prompt)
-        answer_text = response.content if hasattr(response, "content") else str(response)
+        answer_text = llm_call(prompt, self.model, self.provider)
         
         return {
             "answer": answer_text,
