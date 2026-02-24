@@ -177,21 +177,25 @@ class EvaluationPipeline:
     
     def _discover_personas(self) -> Dict[str, Any]:
         """Discover personas from GitHub repo."""
-        from doc_benchmarks.personas import PersonaAnalyzer
+        import os
+        from doc_benchmarks.personas import PersonaAnalyzer, PersonaGenerator
         
-        analyzer = PersonaAnalyzer(
-            model=self.model,
-            provider=self.provider
-        )
+        github_token = os.getenv("GITHUB_TOKEN")
+        analyzer = PersonaAnalyzer(github_token=github_token)
         
-        personas = analyzer.discover_personas(
-            repo_name=self.repo,
+        # Analyze repository
+        analysis = analyzer.analyze_repository(self.repo)
+        
+        # Generate personas
+        generator = PersonaGenerator(model=self.model, provider=self.provider)
+        personas = generator.generate_personas(
             library_name=self.product,
+            analysis=analysis,
             target_count=self.personas_count
         )
         
         # Save personas
-        analyzer.save_personas(personas, self.personas_path)
+        generator.save_personas(personas, self.personas_path)
         
         return personas
     
