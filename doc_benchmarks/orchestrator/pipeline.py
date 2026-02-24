@@ -239,7 +239,28 @@ class EvaluationPipeline:
         # Load custom questions if provided
         if self.custom_questions_path and self.custom_questions_path.exists():
             custom_data = json.loads(self.custom_questions_path.read_text())
-            custom_questions = custom_data.get("questions", custom_data)
+            
+            # Handle both dict format {"questions": [...]} and direct list format
+            if isinstance(custom_data, dict):
+                custom_questions = custom_data.get("questions")
+                if custom_questions is None:
+                    raise ValueError(
+                        f"Custom questions file must have 'questions' key or be a list. "
+                        f"Got dict with keys: {list(custom_data.keys())}"
+                    )
+            elif isinstance(custom_data, list):
+                custom_questions = custom_data
+            else:
+                raise ValueError(
+                    f"Custom questions must be a dict with 'questions' key or a list. "
+                    f"Got: {type(custom_data).__name__}"
+                )
+            
+            # Validate it's a list
+            if not isinstance(custom_questions, list):
+                raise ValueError(
+                    f"Expected list of questions, got {type(custom_questions).__name__}"
+                )
             
             # Add source tracking
             for q in custom_questions:
