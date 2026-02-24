@@ -23,7 +23,7 @@ This runs the full pipeline:
 
 All results saved to current directory (or `--output-dir`):
 
-```
+```text
 personas/oneDNN.json       # Discovered user personas
 questions/oneDNN.json      # Generated + custom questions (deduplicated)
 answers/oneDNN.json        # WITH/WITHOUT answers
@@ -101,7 +101,7 @@ cat reports/oneDNN.md
 ```
 
 **Output:**
-```
+```text
 Starting full evaluation pipeline for oneDNN
 Repository: oneapi-src/oneDNN
 Output directory: .
@@ -150,7 +150,7 @@ python cli.py evaluate --product X --repo Y
 
 ## Pipeline Architecture
 
-```
+```text
 GitHub Repo
     ↓
 Persona Discovery (analyze repo structure, README, issues)

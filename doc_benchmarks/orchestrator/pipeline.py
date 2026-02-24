@@ -166,7 +166,7 @@ class EvaluationPipeline:
         
         # Step 6: Generate report
         logger.info("Step 6/6: Generating report...")
-        report = self._generate_report(evaluations, merged_questions)
+        self._generate_report(evaluations, merged_questions)
         results["steps"]["report"] = {
             "path": str(self.report_path)
         }
@@ -252,7 +252,7 @@ class EvaluationPipeline:
         
         # Deduplicate
         validator = QuestionValidator(similarity_threshold=0.85)
-        unique_questions = validator._deduplicate(all_questions)
+        unique_questions, _ = validator._deduplicate(all_questions)
         
         # Save merged questions
         output = {

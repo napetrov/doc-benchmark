@@ -406,7 +406,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         print("\n" + "="*80)
         print("✅ Pipeline completed successfully!")
         print("="*80)
-        print(f"\nOutput files:")
+        print("\nOutput files:")
         print(f"  Personas:   {results['steps']['personas']['path']}")
         print(f"  Questions:  {results['steps']['questions_merged']['path']}")
         print(f"  Answers:    {results['steps']['answers']['path']}")
@@ -415,7 +415,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         
         if "summary" in results["steps"]["evaluation"]:
             summary = results["steps"]["evaluation"]["summary"]
-            print(f"\nResults:")
+            print("\nResults:")
             print(f"  WITH docs avg:    {summary['with_avg']}")
             print(f"  WITHOUT docs avg: {summary['without_avg']}")
             print(f"  Delta:            {summary['delta_avg']:+.1f}")
