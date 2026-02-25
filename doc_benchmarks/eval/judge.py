@@ -7,7 +7,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from doc_benchmarks.llm import llm_call
+from doc_benchmarks.llm import llm_call, ChatOpenAI, ChatAnthropic, LANGCHAIN_AVAILABLE
 
 
 JUDGE_PROMPT = """You are evaluating the quality of an answer to a technical question.
@@ -74,8 +74,22 @@ class Judge:
             provider: "openai" or "anthropic"
             api_key: Optional API key
         """
+        if not LANGCHAIN_AVAILABLE:
+            raise ImportError(
+                "langchain not available. "
+                "Install: pip install langchain-openai langchain-anthropic"
+            )
+
         self.model = model
         self.provider = provider
+        self.api_key = api_key
+
+        if provider == "openai":
+            self.llm = ChatOpenAI(model=model, api_key=api_key)
+        elif provider == "anthropic":
+            self.llm = ChatAnthropic(model=model, api_key=api_key)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
         
         logger.info(f"Judge initialized: {provider}/{model}")
     
@@ -193,7 +207,8 @@ class Judge:
             library_name=library_name
         )
         
-        raw = llm_call(prompt, self.model, self.provider)
+        response = self.llm.invoke(prompt)
+        raw = response.content if hasattr(response, "content") else str(response)
         
         # Parse JSON
         start = raw.find("{")

@@ -148,7 +148,7 @@ class TestRetrieveDocs:
         with patch('doc_benchmarks.eval.answerer.ChatOpenAI', mock_cls, create=True), \
              patch('doc_benchmarks.eval.answerer.LANGCHAIN_AVAILABLE', True):
             answerer = Answerer(mcp_client=mock_mcp_client)
-            docs = answerer._retrieve_docs("uxlfoundation/oneTBB", "test question", 4000)
+            docs = answerer._retrieve_docs("uxlfoundation/oneTBB", "parallel_for", 4000)
             
             mock_mcp_client.get_library_docs.assert_called_once()
             assert len(docs) > 0

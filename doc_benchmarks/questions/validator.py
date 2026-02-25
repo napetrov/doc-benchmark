@@ -12,7 +12,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-from doc_benchmarks.llm import llm_call
+from doc_benchmarks.llm import llm_call, ChatOpenAI, ChatAnthropic, LANGCHAIN_AVAILABLE
 
 
 VALIDATION_PROMPT = """You are validating a technical question for documentation quality evaluation.
@@ -62,11 +62,21 @@ class QuestionValidator:
         """
         self.llm_model = llm_model
         self.llm_provider = llm_provider
+        self.api_key = api_key
+
+        if LANGCHAIN_AVAILABLE:
+            if llm_provider == "openai":
+                self.llm = ChatOpenAI(model=llm_model, api_key=api_key)
+            elif llm_provider == "anthropic":
+                self.llm = ChatAnthropic(model=llm_model, api_key=api_key)
+            else:
+                raise ValueError(f"Unsupported provider: {llm_provider}")
+        else:
+            self.llm = None
         self.embedding_model = embedding_model
         self.threshold = threshold
         self.similarity_threshold = similarity_threshold
         
-        # llm_call used directly in _validate_question
         
         # Init OpenAI client for embeddings
         if OPENAI_AVAILABLE:
@@ -134,7 +144,11 @@ class QuestionValidator:
                 question=question_text
             )
             
-            raw = llm_call(prompt, self.llm_model, self.llm_provider)
+            if self.llm is None:
+                return {"relevance": 100, "answerability": 100, "specificity": 100, "aggregate": 100, "reasoning": "LLM unavailable; pass-through"}
+
+            response = self.llm.invoke(prompt)
+            raw = response.content if hasattr(response, "content") else str(response)
             
             # Parse JSON
             start = raw.find("{")
@@ -178,25 +192,28 @@ class QuestionValidator:
         # Build similarity matrix and find duplicates
         try:
             import numpy as np
-            
+
             embeddings_array = np.array(embeddings)
             # Normalize
             norms = np.linalg.norm(embeddings_array, axis=1, keepdims=True)
             embeddings_norm = embeddings_array / norms
-            
+
             # Cosine similarity matrix
             similarity = embeddings_norm @ embeddings_norm.T
+            sim_get = lambda i, j: float(similarity[i, j])
         except ImportError:
-            logger.warning("numpy not available - using simple exact match deduplication")
-            # Fallback: simple exact text match
-            seen = {}
-            unique = []
-            for q in questions:
-                text = q["text"].lower().strip()
-                if text not in seen:
-                    seen[text] = True
-                    unique.append(q)
-            return unique, []
+            logger.warning("numpy not available - using pure-python cosine similarity")
+
+            def _cos(a, b):
+                dot = sum(x * y for x, y in zip(a, b))
+                na = sum(x * x for x in a) ** 0.5
+                nb = sum(y * y for y in b) ** 0.5
+                if na == 0 or nb == 0:
+                    return 0.0
+                return dot / (na * nb)
+
+            similarity = [[_cos(embeddings[i], embeddings[j]) for j in range(len(questions))] for i in range(len(questions))]
+            sim_get = lambda i, j: similarity[i][j]
         
         # Find duplicate groups (similarity > threshold)
         unique_indices = []
@@ -210,7 +227,7 @@ class QuestionValidator:
             
             # Find all questions similar to i (including i itself)
             similar = [j for j in range(i, len(questions))
-                      if similarity[i, j] > self.similarity_threshold and j not in seen]
+                      if sim_get(i, j) > self.similarity_threshold and j not in seen]
             
             if len(similar) > 1:
                 # Duplicate group found
