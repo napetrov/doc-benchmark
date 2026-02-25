@@ -155,7 +155,8 @@ class TestValidateAndDedupe:
         with patch('doc_benchmarks.questions.validator.ChatOpenAI', mock_llm_cls, create=True), \
              patch('doc_benchmarks.questions.validator.OpenAI', mock_openai_cls, create=True), \
              patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True), \
-             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', True):
+             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', True), \
+             patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy'}):
             val = QuestionValidator(threshold=60)
             validated, stats = val.validate_and_dedupe("oneTBB", sample_questions)
             
@@ -186,6 +187,7 @@ class TestValidateAndDedupe:
              patch('doc_benchmarks.questions.validator.OpenAI', mock_openai_cls, create=True), \
              patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True), \
              patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', True), \
+             patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy'}), \
              patch.dict('sys.modules', {'numpy': None}):
             val = QuestionValidator(similarity_threshold=0.85)
             validated, stats = val.validate_and_dedupe("oneTBB", sample_questions)
@@ -204,7 +206,8 @@ class TestValidateAndDedupe:
         with patch('doc_benchmarks.questions.validator.ChatOpenAI', mock_llm_cls, create=True), \
              patch('doc_benchmarks.questions.validator.OpenAI', mock_openai_cls, create=True), \
              patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True), \
-             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', True):
+             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', True), \
+             patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy'}):
             val = QuestionValidator()
             validated, stats = val.validate_and_dedupe("oneTBB", sample_questions)
             
@@ -244,6 +247,7 @@ class TestDeduplicate:
         
         with patch('doc_benchmarks.questions.validator.OpenAI', mock_openai_cls, create=True), \
              patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', True), \
+             patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy'}), \
              patch.dict('sys.modules', {'numpy': None}):
             val = QuestionValidator(similarity_threshold=0.99)
             unique, dup_groups = val._deduplicate(questions)
