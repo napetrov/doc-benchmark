@@ -106,7 +106,8 @@ class TestValidateQuestion:
     def test_returns_score_dict(self, mock_llm_validator):
         mock_cls = Mock(return_value=mock_llm_validator)
         with patch('doc_benchmarks.questions.validator.ChatOpenAI', mock_cls, create=True), \
-             patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True):
+             patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True), \
+             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', False):
             val = QuestionValidator()
             score = val._validate_question("oneTBB", "How to use parallel_for?")
             
@@ -117,7 +118,8 @@ class TestValidateQuestion:
             assert "aggregate" in score
     
     def test_no_llm_returns_default_score(self):
-        with patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', False):
+        with patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', False), \
+             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', False):
             val = QuestionValidator()
             score = val._validate_question("oneTBB", "Test question?")
             
@@ -128,7 +130,8 @@ class TestValidateQuestion:
         mock_cls = Mock(return_value=mock_llm_validator)
         
         with patch('doc_benchmarks.questions.validator.ChatOpenAI', mock_cls, create=True), \
-             patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True):
+             patch('doc_benchmarks.questions.validator.LANGCHAIN_AVAILABLE', True), \
+             patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', False):
             val = QuestionValidator()
             score = val._validate_question("oneTBB", "Test?")
             assert score is None
