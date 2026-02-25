@@ -88,7 +88,7 @@ class TestAnswererInit:
         with patch('doc_benchmarks.eval.answerer.LANGCHAIN_AVAILABLE', False):
             with pytest.raises(ImportError) as exc:
                 Answerer()
-            assert "langchain not available" in str(exc.value)
+            assert "LLM dependencies not available" in str(exc.value)
 
 
 class TestGenerateAnswers:

@@ -85,7 +85,10 @@ class PersonaGenerator:
             api_key: API key (optional, will use env var if not provided)
         """
         if not LANGCHAIN_AVAILABLE:
-            raise ImportError("langchain not available. Install: pip install langchain-openai langchain-anthropic")
+            raise ImportError(
+                "LLM dependencies not available. "
+                "Install: pip install litellm"
+            )
 
         self.model = model
         self.provider = provider

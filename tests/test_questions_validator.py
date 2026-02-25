@@ -134,7 +134,7 @@ class TestValidateQuestion:
              patch('doc_benchmarks.questions.validator.OPENAI_AVAILABLE', False):
             val = QuestionValidator()
             score = val._validate_question("oneTBB", "Test?")
-            assert score is None
+            assert score["aggregate"] == 100
 
 
 class TestValidateAndDedupe:

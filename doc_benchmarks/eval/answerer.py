@@ -66,8 +66,8 @@ class Answerer:
         """
         if not LANGCHAIN_AVAILABLE:
             raise ImportError(
-                "langchain not available. "
-                "Install: pip install langchain-openai langchain-anthropic"
+                "LLM dependencies not available. "
+                "Install: pip install litellm"
             )
 
         self.mcp_client = mcp_client
