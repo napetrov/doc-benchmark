@@ -152,7 +152,7 @@ class Answerer:
             if output_path is not None:
                 self._save_incremental(answers, output_path)
 
-        print(f"\n✓ Generated answers:", flush=True)
+        print("\n✓ Generated answers:", flush=True)
         print(f"  WITH docs: {sum(1 for a in answers if a.get('with_docs'))}/{n}", flush=True)
         print(f"  WITHOUT docs: {sum(1 for a in answers if a.get('without_docs'))}/{n}", flush=True)
         if errors:

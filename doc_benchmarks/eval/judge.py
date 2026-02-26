@@ -151,7 +151,7 @@ class Judge:
             avg_with = sum((e.get("with_docs") or {}).get("aggregate", 0) for e in valid) / len(valid)
             avg_without = sum((e.get("without_docs") or {}).get("aggregate", 0) for e in valid) / len(valid)
             avg_delta = sum(e["delta"] for e in valid) / len(valid)
-            print(f"\n✓ Evaluation complete:", flush=True)
+            print("\n✓ Evaluation complete:", flush=True)
             print(f"  WITH docs avg: {avg_with:.1f}", flush=True)
             print(f"  WITHOUT docs avg: {avg_without:.1f}", flush=True)
             print(f"  Average delta: {avg_delta:.1f}", flush=True)
