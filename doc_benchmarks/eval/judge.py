@@ -2,6 +2,7 @@
 
 import logging
 import json
+import os
 import time
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -259,8 +260,10 @@ class Judge:
             "total_evaluations": len(evaluations),
             "evaluations": evaluations
         }
-        with open(output_path, 'w') as f:
+        tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+        with open(tmp_path, 'w', encoding='utf-8') as f:
             json.dump(output, f, indent=2)
+        os.replace(tmp_path, output_path)
 
     def save_evaluations(
         self,
