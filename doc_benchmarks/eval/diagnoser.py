@@ -38,7 +38,7 @@ LOW_RELEVANCE_CUTOFF = 0.3
 # Diagnosis labels (exported for reporting)
 DOCS_HELPED = "docs_helped"
 EMPTY_RETRIEVAL = "empty_retrieval"
-BELOW_THRESHOLD = "below_threshold"
+BELOW_THRESHOLD = "below_threshold"  # reserved — not yet emitted by diagnose()
 LOW_RELEVANCE = "low_relevance"
 KNOWLEDGE_SUFFICIENT = "knowledge_sufficient"
 INSUFFICIENT_DATA = "insufficient_data"
@@ -149,7 +149,7 @@ def summarise_diagnoses(evaluations: list) -> Dict[str, Any]:
     -------
     dict with:
         - ``counts``  : {label: int}
-        - ``rates``   : {label: float}  (0–1)
+        - ``rates``   : {label: float}  (0-1)
         - ``total``   : int
         - ``failures``: list of eval dicts where delta < 0
     """

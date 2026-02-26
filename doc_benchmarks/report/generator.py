@@ -7,6 +7,12 @@ from pathlib import Path
 from collections import defaultdict
 import re
 
+from doc_benchmarks.eval.diagnoser import (
+    summarise_diagnoses,
+    DIAGNOSIS_LABELS,
+    DIAGNOSIS_DESCRIPTIONS,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +68,6 @@ class ReportGenerator:
         clusters = self._cluster_by_topic(evaluations, q_lookup)
 
         # Failure analysis
-        from doc_benchmarks.eval.diagnoser import summarise_diagnoses
         failure_summary = summarise_diagnoses(evaluations)
 
         if output_format == "json":
@@ -316,7 +321,6 @@ class ReportGenerator:
         
         # ── Failure Analysis section ─────────────────────────────────────
         if failure_summary:
-            from doc_benchmarks.eval.diagnoser import DIAGNOSIS_LABELS, DOCS_HELPED
             lines.extend([
                 "",
                 "---",
@@ -333,7 +337,6 @@ class ReportGenerator:
             for label, display in DIAGNOSIS_LABELS.items():
                 count = counts.get(label, 0)
                 rate = f"{count / total_q:.0%}"
-                from doc_benchmarks.eval.diagnoser import DIAGNOSIS_DESCRIPTIONS
                 desc = DIAGNOSIS_DESCRIPTIONS.get(label, "")
                 lines.append(f"| {display} | {count} | {rate} | {desc} |")
 
@@ -356,7 +359,6 @@ class ReportGenerator:
                         f"{k}={v}" for k, v in evidence.items()
                         if k != "delta" and v is not None
                     )
-                    q_text = e.get("question_text", "")[:60]
                     lines.append(
                         f"| {e['question_id']} | **{(e.get('delta') or 0):+.1f}** "
                         f"| {display} | {ev_str} |"
