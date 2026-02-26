@@ -31,19 +31,19 @@ class URLClient(MCPClient):
         url: str,
         timeout: int = 30,
         cache_dir: Optional[Path] = None,
-        max_page_size_kb: int = 1024,
+        max_page_size_kchars: int = 1024,
     ):
         """
         Args:
             url: Documentation URL to fetch.
             timeout: HTTP request timeout in seconds.
             cache_dir: Directory for caching fetched pages (None = no cache).
-            max_page_size_kb: Truncate pages larger than this (measured in characters).
+            max_page_size_kchars: Truncate pages larger than this (measured in characters).
         """
         self.url = url
         self.timeout = timeout
         self.cache_dir = Path(cache_dir) if cache_dir else None
-        self.max_page_size_chars = max_page_size_kb * 1024
+        self.max_page_size_chars = max_page_size_kchars * 1024
 
         if self.cache_dir:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
