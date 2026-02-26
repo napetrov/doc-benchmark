@@ -131,6 +131,8 @@ def diagnose(
 
         if top_score < low_relevance_cutoff:
             return _result(LOW_RELEVANCE, evidence)
+    else:
+        evidence["scores_available"] = False
 
     # 3. Docs were relevant — model already knew the answer
     return _result(KNOWLEDGE_SUFFICIENT, evidence)

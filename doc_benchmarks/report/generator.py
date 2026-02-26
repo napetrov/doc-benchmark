@@ -83,7 +83,7 @@ class ReportGenerator:
         else:
             return self._format_markdown(
                 stats, top_with, bottom_with, top_deltas, bottom_deltas,
-                clusters, q_lookup, failure_summary
+                clusters, failure_summary
             )
     
     def _compute_stats(self, evaluations: List[Dict]) -> Dict[str, Any]:
@@ -224,7 +224,6 @@ class ReportGenerator:
         top_deltas: List[Dict],
         bottom_deltas: List[Dict],
         clusters: List[Dict],
-        q_lookup: Dict[str, Dict],
         failure_summary: Optional[Dict] = None,
     ) -> str:
         """Format report as Markdown."""
