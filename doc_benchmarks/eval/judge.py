@@ -161,7 +161,7 @@ class Judge:
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             futures = {pool.submit(_process, i, a): i for i, a in enumerate(answers)}
             for f in as_completed(futures):
-                f.result()
+                f.result()  # wait for completion
 
         evaluations = [results[i] for i in range(n)]
         valid = [e for e in evaluations if e.get("delta") is not None]

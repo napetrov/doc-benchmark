@@ -165,7 +165,7 @@ class Answerer:
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             futures = {pool.submit(_process, i, q): i for i, q in enumerate(questions)}
             for f in as_completed(futures):
-                f.result()  # re-raise exceptions if any slipped through
+                f.result()  # wait for completion
 
         answers = [results[i] for i in range(n)]
         ok_with = sum(1 for a in answers if a.get("with_docs"))
