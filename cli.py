@@ -285,7 +285,6 @@ def cmd_personas_discover(args: argparse.Namespace) -> None:
     else:
         # Description-only
         if args.save_analysis:
-            import sys
             print("⚠ --save-analysis is ignored in description-only mode.", file=sys.stderr)
         print(f"No repo — generating personas from description for '{args.product}'")
         analysis = PersonaAnalyzer.create_minimal_analysis(
