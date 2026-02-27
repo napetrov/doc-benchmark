@@ -27,8 +27,9 @@ class EvaluationPipeline:
     def __init__(
         self,
         product: str,
-        repo: str,
         output_dir: Path,
+        repo: Optional[str] = None,
+        description: Optional[str] = None,
         custom_questions_path: Optional[Path] = None,
         model: str = "gpt-4o-mini",
         provider: str = "openai",
@@ -46,8 +47,13 @@ class EvaluationPipeline:
 
         Args:
             product: Product name (e.g., "oneDNN")
-            repo: GitHub repo (e.g., "oneapi-src/oneDNN")
             output_dir: Base directory for outputs
+            repo: GitHub repo (e.g., "oneapi-src/oneDNN").  Optional — when
+                omitted, ``description`` must be provided so the LLM can
+                generate personas without GitHub data.
+            description: Plain-text description of the product.  Used as the
+                sole signal for persona generation when ``repo`` is not given.
+                Also useful to supplement GitHub data.
             custom_questions_path: Optional path to manual questions JSON
             model: LLM model for generation/answering
             provider: Provider for generation/answering
@@ -61,8 +67,16 @@ class EvaluationPipeline:
             doc_source: Documentation source descriptor — 'context7' (default),
                 'local:<path>', or 'url:<url>'
         """
+        if not repo and not description:
+            raise ValueError(
+                "Either --repo or --description must be provided. "
+                "Supply --repo for GitHub-based persona discovery, or "
+                "--description for products without a public repository."
+            )
+
         self.product = product
         self.repo = repo
+        self.description = description
         self.output_dir = Path(output_dir)
         self.custom_questions_path = Path(custom_questions_path) if custom_questions_path else None
 
@@ -182,18 +196,28 @@ class EvaluationPipeline:
         return results
     
     def _discover_personas(self) -> Dict[str, Any]:
-        """Discover personas from GitHub repo."""
+        """Discover personas — from GitHub repo or from a plain description."""
         import os
         from doc_benchmarks.personas import PersonaAnalyzer, PersonaGenerator
-        
-        github_token = os.getenv("GITHUB_TOKEN")
-        analyzer = PersonaAnalyzer(github_token=github_token)
-        
-        # Analyze repository
-        analysis = analyzer.analyze_repository(self.repo)
-        
-        # Generate personas
+
         generator = PersonaGenerator(model=self.model, provider=self.provider)
+
+        if self.repo:
+            # --- GitHub-based discovery ---
+            github_token = os.getenv("GITHUB_TOKEN")
+            analyzer = PersonaAnalyzer(github_token=github_token)
+            logger.info(f"Analysing repository: {self.repo}")
+            analysis = analyzer.analyze_repository(self.repo)
+        else:
+            # --- Description-only discovery (no GitHub repo) ---
+            logger.info(
+                f"No repo provided — generating personas from description for '{self.product}'"
+            )
+            analysis = PersonaAnalyzer.create_minimal_analysis(
+                library_name=self.product,
+                description=self.description or "",
+            )
+
         personas = generator.generate_personas(
             library_name=self.product,
             analysis=analysis,

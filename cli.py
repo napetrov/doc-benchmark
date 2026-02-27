@@ -258,37 +258,50 @@ def cmd_report(args: argparse.Namespace) -> None:
 
 
 def cmd_personas_discover(args: argparse.Namespace) -> None:
-    """Discover personas for a product by analyzing GitHub repo."""
+    """Discover personas for a product by analyzing GitHub repo or a description."""
     import os
-    
-    # Initialize analyzer
-    github_token = args.github_token or os.getenv("GITHUB_TOKEN")
-    analyzer = PersonaAnalyzer(github_token=github_token)
-    
-    # Analyze repository
-    print(f"Analyzing repository: {args.repo}")
-    analysis = analyzer.analyze_repository(args.repo)
-    
-    # Save analysis if requested
-    if args.save_analysis:
-        analysis_path = Path(args.output).parent / f"{args.product}_analysis.json"
-        analyzer.save_analysis(analysis, analysis_path)
-        print(f"✓ Saved analysis to {analysis_path}")
-    
+
+    if not args.repo and not args.description:
+        print(
+            "✗ Either --repo or --description must be provided.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    generator = PersonaGenerator(model=args.model, provider=args.provider)
+
+    if args.repo:
+        # GitHub-based discovery
+        github_token = args.github_token or os.getenv("GITHUB_TOKEN")
+        analyzer = PersonaAnalyzer(github_token=github_token)
+        print(f"Analyzing repository: {args.repo}")
+        analysis = analyzer.analyze_repository(args.repo)
+
+        if args.save_analysis:
+            output_path = Path(args.output) if args.output else Path(f"personas/{args.product}.json")
+            analysis_path = output_path.parent / f"{args.product}_analysis.json"
+            analyzer.save_analysis(analysis, analysis_path)
+            print(f"✓ Saved analysis to {analysis_path}")
+    else:
+        # Description-only
+        print(f"No repo — generating personas from description for '{args.product}'")
+        analysis = PersonaAnalyzer.create_minimal_analysis(
+            library_name=args.product,
+            description=args.description,
+        )
+
     # Generate personas
     print(f"Generating personas using {args.model}...")
-    generator = PersonaGenerator(model=args.model, provider=args.provider)
-    
     personas = generator.generate_personas(
         library_name=args.product,
         analysis=analysis,
         target_count=args.count
     )
-    
+
     # Save personas
-    output_path = Path(args.output)
+    output_path = Path(args.output) if args.output else Path(f"personas/{args.product}.json")
     generator.save_personas(personas, output_path)
-    
+
     print(f"\n✓ Generated {len(personas['personas'])} personas for {args.product}")
     print(f"✓ Saved to {output_path}")
     print("\nNext steps:")
@@ -528,18 +541,22 @@ def cmd_report_generate(args: argparse.Namespace) -> None:
 def cmd_evaluate(args: argparse.Namespace) -> None:
     """Run full evaluation pipeline (orchestrator)."""
     from doc_benchmarks.orchestrator import EvaluationPipeline
-    
+
     print(f"Starting full evaluation pipeline for {args.product}")
-    print(f"Repository: {args.repo}")
+    if args.repo:
+        print(f"Repository: {args.repo}")
+    else:
+        print(f"Description: {(args.description or '')[:80]}")
     print(f"Output directory: {args.output_dir}")
     if args.custom_questions:
         print(f"Custom questions: {args.custom_questions}")
     print()
-    
+
     # Create pipeline
     pipeline = EvaluationPipeline(
         product=args.product,
-        repo=args.repo,
+        repo=getattr(args, "repo", None),
+        description=getattr(args, "description", None),
         output_dir=Path(args.output_dir),
         custom_questions_path=Path(args.custom_questions) if args.custom_questions else None,
         model=args.model,
@@ -611,7 +628,8 @@ def build_parser() -> argparse.ArgumentParser:
     # evaluate (orchestrator) - full pipeline
     eval_p = sub.add_parser("evaluate", help="Run full evaluation pipeline (one command)")
     eval_p.add_argument("--product", required=True, help="Product name (e.g., oneDNN)")
-    eval_p.add_argument("--repo", required=True, help="GitHub repo (e.g., oneapi-src/oneDNN)")
+    eval_p.add_argument("--repo", default=None, help="GitHub repo (e.g., oneapi-src/oneDNN). Optional if --description is given.")
+    eval_p.add_argument("--description", default=None, help="Plain-text product description (used when --repo is not available).")
     eval_p.add_argument("--output-dir", default=".", help="Base output directory")
     eval_p.add_argument("--custom-questions", default=None, help="Optional: path to manual questions JSON")
     eval_p.add_argument("--model", default="gpt-4o-mini", help="LLM model for generation/answering")
@@ -678,7 +696,8 @@ def build_parser() -> argparse.ArgumentParser:
     # personas discover
     discover_p = personas_sub.add_parser("discover", help="Auto-discover personas from GitHub repo")
     discover_p.add_argument("--product", required=True, help="Product name (e.g., oneTBB)")
-    discover_p.add_argument("--repo", required=True, help="GitHub repo (e.g., uxlfoundation/oneTBB)")
+    discover_p.add_argument("--repo", default=None, help="GitHub repo (e.g., uxlfoundation/oneTBB). Optional if --description is given.")
+    discover_p.add_argument("--description", default=None, help="Plain-text product description (used when --repo is not available).")
     discover_p.add_argument("--output", default=None, help="Output file (default: personas/{product}.json)")
     discover_p.add_argument("--count", type=int, default=5, help="Target number of personas (5-8)")
     discover_p.add_argument("--model", default="gpt-4o-mini", help="LLM model for generation")
