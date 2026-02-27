@@ -375,8 +375,11 @@ def cmd_questions_generate(args: argparse.Namespace) -> None:
         from doc_benchmarks.mcp.factory import create_doc_source_client
         mcp_client = create_doc_source_client(doc_source)
         library_id = mcp_client.resolve_library_id(args.product)
-        
-        # Extract topics
+        # Allow explicit override via --context7-id
+        if getattr(args, "context7_id", None):
+            library_id = args.context7_id
+            print(f"Using explicit Context7 library ID: {library_id}")
+
         extractor = RagasSeedExtractor(mcp_client=mcp_client, cache_dir=Path(".cache/topics"))
         topics = extractor.extract_topics(
             library_id=library_id,
@@ -449,7 +452,10 @@ def cmd_answers_generate(args: argparse.Namespace) -> None:
     print(f"Documentation source: {doc_source}")
     mcp_client = create_doc_source_client(doc_source)
     library_id = mcp_client.resolve_library_id(args.product)
-    
+    if getattr(args, "context7_id", None):
+        library_id = args.context7_id
+        print(f"Using explicit Context7 library ID: {library_id}")
+
     print(f"Generating answers for {args.product} (library_id={library_id})")
     print(f"Using model: {args.provider}/{args.model}")
     
@@ -569,6 +575,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         rerank_threshold=args.rerank_threshold,
         debug_retrieval=args.debug_retrieval,
         doc_source=getattr(args, "doc_source", "context7"),
+        context7_id=getattr(args, "context7_id", None),
     )
     
     # Run pipeline
@@ -643,6 +650,8 @@ def build_parser() -> argparse.ArgumentParser:
     eval_p.add_argument("--debug-retrieval", action="store_true", help="Include retrieval metadata")
     eval_p.add_argument("--doc-source", default="context7",
                         help="Documentation source: 'context7' (default), 'local:<path>', 'url:<url>'")
+    eval_p.add_argument("--context7-id", default=None, dest="context7_id",
+                        help="Explicit Context7 library ID (e.g., 'intel/mkl-dnn'). Overrides auto-resolution.")
     eval_p.set_defaults(func=cmd_evaluate)
 
     cmp_p = sub.add_parser("compare")
@@ -735,6 +744,8 @@ def build_parser() -> argparse.ArgumentParser:
     gen_q_p.add_argument("--provider", default="openai", choices=["openai", "anthropic"])
     gen_q_p.add_argument("--doc-source", default="context7",
                          help="Documentation source for topic extraction: 'context7', 'local:<path>', 'url:<url>'")
+    gen_q_p.add_argument("--context7-id", default=None, dest="context7_id",
+                         help="Explicit Context7 library ID. Overrides auto-resolution.")
     gen_q_p.set_defaults(func=cmd_questions_generate)
     
     # Answers subcommand group
@@ -755,6 +766,8 @@ def build_parser() -> argparse.ArgumentParser:
     gen_a_p.add_argument("--concurrency", type=positive_int, default=5, help="Parallel API calls (default: 5)")
     gen_a_p.add_argument("--doc-source", default="context7",
                          help="Documentation source: 'context7' (default), 'local:<path>', 'url:<url>'")
+    gen_a_p.add_argument("--context7-id", default=None, dest="context7_id",
+                         help="Explicit Context7 library ID. Overrides auto-resolution.")
     gen_a_p.set_defaults(func=cmd_answers_generate)
     
     # Eval subcommand group

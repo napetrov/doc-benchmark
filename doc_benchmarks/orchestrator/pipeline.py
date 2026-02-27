@@ -41,6 +41,7 @@ class EvaluationPipeline:
         rerank_threshold: float = 0.3,
         debug_retrieval: bool = False,
         doc_source: str = "context7",
+        context7_id: Optional[str] = None,
     ):
         """
         Initialize pipeline.
@@ -66,6 +67,8 @@ class EvaluationPipeline:
             debug_retrieval: Include retrieval metadata
             doc_source: Documentation source descriptor — 'context7' (default),
                 'local:<path>', or 'url:<url>'
+            context7_id: Explicit Context7 library ID (e.g., 'intel/mkl-dnn').
+                Overrides the auto-resolved ID when doc_source is 'context7'.
         """
         if not repo and not description:
             raise ValueError(
@@ -91,7 +94,8 @@ class EvaluationPipeline:
         self.rerank_threshold = rerank_threshold
         self.debug_retrieval = debug_retrieval
         self.doc_source = doc_source
-        
+        self.context7_id = context7_id
+
         # Output paths
         self.personas_path = self.output_dir / "personas" / f"{product}.json"
         self.questions_path = self.output_dir / "questions" / f"{product}.json"
@@ -235,7 +239,7 @@ class EvaluationPipeline:
 
         # Extract topics
         mcp_client = create_doc_source_client(self.doc_source)
-        library_id = mcp_client.resolve_library_id(self.product)
+        library_id = self.context7_id or mcp_client.resolve_library_id(self.product)
         
         extractor = RagasSeedExtractor(mcp_client=mcp_client, cache_dir=Path(".cache/topics"))
         topics = extractor.extract_topics(
@@ -325,7 +329,7 @@ class EvaluationPipeline:
 
         # Setup documentation source client
         mcp_client = create_doc_source_client(self.doc_source)
-        library_id = mcp_client.resolve_library_id(self.product)
+        library_id = self.context7_id or mcp_client.resolve_library_id(self.product)
         
         # Generate answers
         answerer = Answerer(
