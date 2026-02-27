@@ -269,6 +269,6 @@ def test_create_minimal_analysis():
     assert analysis["description"] == "Math Kernel Library for high performance computing"
     assert analysis["readme_content"] == "Math Kernel Library for high performance computing"
     assert analysis["use_cases"] == []
-    assert analysis["issues_analysis"] == {"common_questions": []}
+    assert analysis["issues_analysis"] == {"common_questions": [], "common_labels": [], "sample_issues": []}
     assert analysis["api_patterns"] == []
     assert analysis["topics"] == []

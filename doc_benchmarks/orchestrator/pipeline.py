@@ -72,9 +72,9 @@ class EvaluationPipeline:
         """
         if not repo and not description:
             raise ValueError(
-                "Either --repo or --description must be provided. "
-                "Supply --repo for GitHub-based persona discovery, or "
-                "--description for products without a public repository."
+                "Either 'repo' or 'description' must be provided. "
+                "Supply 'repo' for GitHub-based persona discovery, or "
+                "'description' for products without a public repository."
             )
 
         self.product = product

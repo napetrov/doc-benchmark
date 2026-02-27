@@ -87,7 +87,11 @@ class PersonaAnalyzer:
             "description": description,
             "readme_content": description,  # used as README summary fallback
             "use_cases": [],
-            "issues_analysis": {"common_questions": []},
+            "issues_analysis": {
+                "common_questions": [],
+                "common_labels": [],
+                "sample_issues": [],
+            },
             "api_patterns": [],
             "topics": [],
         }

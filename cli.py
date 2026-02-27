@@ -284,6 +284,9 @@ def cmd_personas_discover(args: argparse.Namespace) -> None:
             print(f"✓ Saved analysis to {analysis_path}")
     else:
         # Description-only
+        if args.save_analysis:
+            import sys
+            print("⚠ --save-analysis is ignored in description-only mode.", file=sys.stderr)
         print(f"No repo — generating personas from description for '{args.product}'")
         analysis = PersonaAnalyzer.create_minimal_analysis(
             library_name=args.product,
@@ -374,11 +377,12 @@ def cmd_questions_generate(args: argparse.Namespace) -> None:
         doc_source = getattr(args, "doc_source", "context7")
         from doc_benchmarks.mcp.factory import create_doc_source_client
         mcp_client = create_doc_source_client(doc_source)
-        library_id = mcp_client.resolve_library_id(args.product)
-        # Allow explicit override via --context7-id
-        if getattr(args, "context7_id", None):
-            library_id = args.context7_id
+        context7_id = getattr(args, "context7_id", None)
+        if context7_id:
+            library_id = context7_id
             print(f"Using explicit Context7 library ID: {library_id}")
+        else:
+            library_id = mcp_client.resolve_library_id(args.product)
 
         extractor = RagasSeedExtractor(mcp_client=mcp_client, cache_dir=Path(".cache/topics"))
         topics = extractor.extract_topics(
@@ -451,10 +455,12 @@ def cmd_answers_generate(args: argparse.Namespace) -> None:
     doc_source = getattr(args, "doc_source", "context7")
     print(f"Documentation source: {doc_source}")
     mcp_client = create_doc_source_client(doc_source)
-    library_id = mcp_client.resolve_library_id(args.product)
-    if getattr(args, "context7_id", None):
-        library_id = args.context7_id
+    context7_id = getattr(args, "context7_id", None)
+    if context7_id:
+        library_id = context7_id
         print(f"Using explicit Context7 library ID: {library_id}")
+    else:
+        library_id = mcp_client.resolve_library_id(args.product)
 
     print(f"Generating answers for {args.product} (library_id={library_id})")
     print(f"Using model: {args.provider}/{args.model}")
@@ -714,14 +720,6 @@ def build_parser() -> argparse.ArgumentParser:
     discover_p.add_argument("--github-token", default=None, help="GitHub token (or set GITHUB_TOKEN env)")
     discover_p.add_argument("--save-analysis", action="store_true", help="Save intermediate analysis JSON")
     discover_p.set_defaults(func=cmd_personas_discover)
-    
-    # Set default output path if not provided
-    def set_default_output(args):
-        if args.output is None:
-            args.output = f"personas/{args.product}.json"
-        return args
-    
-    discover_p.set_defaults(func=lambda args: cmd_personas_discover(set_default_output(args)))
     
     # personas approve
     approve_p = personas_sub.add_parser("approve", help="Validate and approve persona file")
