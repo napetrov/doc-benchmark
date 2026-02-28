@@ -932,7 +932,7 @@ def _run_single_library(entry, output_dir: str, model: str, provider: str, judge
     from pathlib import Path as _Path
 
     doc_source = doc_source_override or (entry.doc_sources[0] if entry.doc_sources else "context7")
-    out = _Path(output_dir) / entry.key
+    out = _Path(output_dir)
 
     print(f"\n{'='*60}")
     print(f"  Library : {entry.name} ({entry.key})")

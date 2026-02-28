@@ -38,14 +38,35 @@ class LibraryRegistry:
             logger.warning(f"Registry not found: {self._path}")
             return
         data = yaml.safe_load(self._path.read_text()) or {}
-        for key, cfg in data.get("libraries", {}).items():
-            self._entries[key.lower()] = LibraryEntry(
+        if not isinstance(data, dict) or "libraries" not in data:
+            logger.warning(f"Registry {self._path} has no 'libraries' key — skipping.")
+            return
+        libraries = data["libraries"]
+        if not isinstance(libraries, dict):
+            logger.warning(f"Registry 'libraries' must be a mapping — skipping.")
+            return
+        for raw_key, cfg in libraries.items():
+            key = raw_key.lower()
+            if key in self._entries:
+                logger.warning(
+                    f"Registry key collision: '{raw_key}' normalizes to '{key}' "
+                    f"which is already registered. Skipping duplicate."
+                )
+                continue
+            if not isinstance(cfg, dict):
+                logger.warning(f"Registry entry '{raw_key}' is not a mapping — skipping.")
+                continue
+            doc_sources = cfg.get("doc_sources", ["context7"])
+            if not isinstance(doc_sources, list) or not doc_sources:
+                logger.warning(f"Registry entry '{raw_key}' has empty doc_sources — defaulting to context7.")
+                doc_sources = ["context7"]
+            self._entries[key] = LibraryEntry(
                 key=key,
-                name=cfg.get("name", key),
+                name=cfg.get("name", raw_key),
                 description=cfg.get("description", "").strip(),
                 repo=cfg.get("repo"),
                 context7_id=cfg.get("context7_id"),
-                doc_sources=cfg.get("doc_sources", ["context7"]),
+                doc_sources=doc_sources,
             )
         logger.info(f"Loaded {len(self._entries)} libraries from {self._path}")
 
