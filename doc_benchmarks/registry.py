@@ -46,6 +46,9 @@ class LibraryRegistry:
             logger.warning(f"Registry 'libraries' must be a mapping — skipping.")
             return
         for raw_key, cfg in libraries.items():
+            if not isinstance(raw_key, str):
+                logger.warning(f"Registry key '{raw_key}' is not a string — skipping.")
+                continue
             key = raw_key.lower()
             if key in self._entries:
                 logger.warning(
@@ -63,7 +66,7 @@ class LibraryRegistry:
             self._entries[key] = LibraryEntry(
                 key=key,
                 name=cfg.get("name", raw_key),
-                description=cfg.get("description", "").strip(),
+                description=str(cfg.get("description") or "").strip(),
                 repo=cfg.get("repo"),
                 context7_id=cfg.get("context7_id"),
                 doc_sources=doc_sources,
