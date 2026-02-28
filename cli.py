@@ -893,7 +893,7 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Directory with evaluation results (default: results/)")
     dash_gen_p.add_argument("--output-dir", default=".", dest="output_dir",
                             help="Where to write DASHBOARD.md + dashboard.json (default: .)")
-    dash_gen_p.add_argument("--top-n", type=int, default=5, dest="top_n",
+    dash_gen_p.add_argument("--top-n", type=positive_int, default=5, dest="top_n",
                             help="Bad questions to show per product (default: 5)")
     dash_gen_p.add_argument("--no-json", action="store_true", dest="no_json",
                             help="Skip JSON output")
@@ -905,7 +905,7 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_dashboard_generate(args: argparse.Namespace) -> None:
     """Aggregate evaluation results and render Markdown + JSON dashboard."""
     from doc_benchmarks.dashboard.aggregator import ResultsAggregator
-    from doc_benchmarks.dashboard.markdown_renderer import save_dashboard_markdown, save_dashboard_json
+    from doc_benchmarks.dashboard.markdown_renderer import render_dashboard, save_dashboard_markdown, save_dashboard_json
 
     results_dir = Path(args.results_dir)
     output_dir = Path(args.output_dir)
@@ -921,7 +921,8 @@ def cmd_dashboard_generate(args: argparse.Namespace) -> None:
     print(f"Found {len(data.products)} product(s): {', '.join(p.product for p in data.products)}")
 
     md_path = output_dir / "DASHBOARD.md"
-    save_dashboard_markdown(data, md_path)
+    md_path.parent.mkdir(parents=True, exist_ok=True)
+    md_path.write_text(render_dashboard(data, top_n_bad_questions=args.top_n))
     print(f"✅ Markdown dashboard: {md_path}")
 
     if not args.no_json:

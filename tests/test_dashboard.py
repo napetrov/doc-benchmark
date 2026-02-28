@@ -33,8 +33,8 @@ def _ev(q_id, question, with_score, without_score):
     return {
         "question_id": q_id,
         "question": question,
-        "with_docs": {"aggregate": with_score, "correctness": with_score, "completeness": with_score} if with_score else None,
-        "without_docs": {"aggregate": without_score, "correctness": without_score} if without_score else None,
+        "with_docs": {"aggregate": with_score, "correctness": with_score, "completeness": with_score} if with_score is not None else None,
+        "without_docs": {"aggregate": without_score, "correctness": without_score} if without_score is not None else None,
         "delta": delta,
     }
 

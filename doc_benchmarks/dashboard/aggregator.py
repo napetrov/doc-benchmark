@@ -82,10 +82,10 @@ class ResultsAggregator:
             logger.warning(f"Results directory not found: {self.results_dir}")
             return DashboardData(generated_at=now, products=[])
 
-        # Find all eval JSON files (evaluations/*.json or eval_*.json patterns)
-        eval_files = list(self.results_dir.rglob("eval_*.json")) + \
-                     list(self.results_dir.rglob("evaluations/*.json")) + \
-                     list(self.results_dir.rglob("**/evaluations.json"))
+        # Find all eval JSON files matching orchestrator output pattern (eval/{product}.json)
+        eval_files = list(self.results_dir.rglob("eval/*.json")) + \
+                     list(self.results_dir.rglob("eval_*.json")) + \
+                     list(self.results_dir.rglob("evaluations/*.json"))
 
         # Deduplicate
         seen = set()
@@ -113,9 +113,15 @@ class ResultsAggregator:
         if not evaluations:
             return None
 
-        # Infer product name from directory structure or data
-        product = data.get("library_name") or data.get("product") or path.parent.parent.name
+        # Infer product name: prefer explicit field, fall back to filename stem
+        product = data.get("library_name") or data.get("product") or path.stem
         library_key = product.lower().replace(" ", "").replace("-", "")
+
+        def _as_float(value: Any) -> Optional[float]:
+            try:
+                return float(value) if value is not None else None
+            except (TypeError, ValueError):
+                return None
 
         questions = []
         with_scores = []
@@ -123,15 +129,17 @@ class ResultsAggregator:
         deltas = []
 
         for ev in evaluations:
+            if not isinstance(ev, dict):
+                continue
             q_id = ev.get("question_id", "")
             q_text = ev.get("question", "")
 
             with_eval = ev.get("with_docs") or {}
             without_eval = ev.get("without_docs") or {}
 
-            with_score = with_eval.get("aggregate") if with_eval else None
-            without_score = without_eval.get("aggregate") if without_eval else None
-            delta = ev.get("delta")
+            with_score = _as_float(with_eval.get("aggregate") if isinstance(with_eval, dict) else None)
+            without_score = _as_float(without_eval.get("aggregate") if isinstance(without_eval, dict) else None)
+            delta = _as_float(ev.get("delta"))
 
             if with_score is not None:
                 with_scores.append(with_score)

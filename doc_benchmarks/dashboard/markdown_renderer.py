@@ -19,6 +19,17 @@ def _status_emoji(status: str) -> str:
     return {"good": "🟢", "fair": "🟡", "poor": "🔴", "no-data": "⚪"}.get(status, "⚪")
 
 
+def _md_cell(text: str) -> str:
+    """Escape pipe and newlines so text is safe inside a Markdown table cell."""
+    return text.replace("|", "\\|").replace("\n", " ").replace("\r", "").strip()
+
+
+def _fmt_delta(delta: Optional[float]) -> str:
+    if delta is None:
+        return "—"
+    return f"+{delta:.1f}" if delta >= 0 else f"{delta:.1f}"
+
+
 def render_dashboard(data: DashboardData, top_n_bad_questions: int = 5) -> str:
     lines = []
     lines.append("# Doc Benchmark Dashboard")
@@ -37,11 +48,10 @@ def render_dashboard(data: DashboardData, top_n_bad_questions: int = 5) -> str:
         emoji = _status_emoji(p.status)
         with_s = f"{p.avg_with_docs:.1f}" if p.avg_with_docs is not None else "—"
         without_s = f"{p.avg_without_docs:.1f}" if p.avg_without_docs is not None else "—"
-        delta_s = (f"+{p.avg_delta:.1f}" if p.avg_delta and p.avg_delta >= 0
-                   else f"{p.avg_delta:.1f}" if p.avg_delta is not None else "—")
+        delta_s = _fmt_delta(p.avg_delta)
         date = p.evaluated_at[:10] if p.evaluated_at else "—"
         lines.append(
-            f"| {emoji} | **{p.product}** | {with_s} | {without_s} | {delta_s} | {p.total_questions} | {date} |"
+            f"| {emoji} | **{_md_cell(p.product)}** | {with_s} | {without_s} | {delta_s} | {p.total_questions} | {date} |"
         )
 
     # ── Score distribution bar ─────────────────────────────────────────────
@@ -69,8 +79,7 @@ def _render_product_section(p: ProductSnapshot, top_n: int) -> list[str]:
 
     with_s = f"{p.avg_with_docs:.1f}/100" if p.avg_with_docs is not None else "—"
     without_s = f"{p.avg_without_docs:.1f}/100" if p.avg_without_docs is not None else "—"
-    delta_s = (f"+{p.avg_delta:.1f}" if p.avg_delta and p.avg_delta >= 0
-               else f"{p.avg_delta:.1f}" if p.avg_delta is not None else "—")
+    delta_s = _fmt_delta(p.avg_delta)
 
     lines.append(f"- **Score with docs**: {with_s}")
     lines.append(f"- **Score without docs**: {without_s}")
@@ -87,9 +96,8 @@ def _render_product_section(p: ProductSnapshot, top_n: int) -> list[str]:
         lines.append("|-------|---|---------|")
         for q in bad:
             score = f"{q.with_docs_score:.0f}" if q.with_docs_score is not None else "—"
-            delta = (f"+{q.delta:.0f}" if q.delta and q.delta >= 0
-                     else f"{q.delta:.0f}" if q.delta is not None else "—")
-            question_short = q.question[:80] + ("…" if len(q.question) > 80 else "")
+            delta = _fmt_delta(round(q.delta, 0) if q.delta is not None else None).replace(".0", "")
+            question_short = _md_cell(q.question[:80] + ("…" if len(q.question) > 80 else ""))
             lines.append(f"| {score} | {delta} | {question_short} |")
 
     lines.append("")
