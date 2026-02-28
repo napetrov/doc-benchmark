@@ -39,7 +39,7 @@ class LibraryRegistry:
             return
         data = yaml.safe_load(self._path.read_text()) or {}
         for key, cfg in data.get("libraries", {}).items():
-            self._entries[key] = LibraryEntry(
+            self._entries[key.lower()] = LibraryEntry(
                 key=key,
                 name=cfg.get("name", key),
                 description=cfg.get("description", "").strip(),

@@ -931,7 +931,7 @@ def _run_single_library(entry, output_dir: str, model: str, provider: str, judge
     from doc_benchmarks.orchestrator import EvaluationPipeline
     from pathlib import Path as _Path
 
-    doc_source = doc_source_override or entry.doc_sources[0]
+    doc_source = doc_source_override or (entry.doc_sources[0] if entry.doc_sources else "context7")
     out = _Path(output_dir) / entry.key
 
     print(f"\n{'='*60}")
@@ -1025,7 +1025,7 @@ def cmd_benchmark_batch(args: argparse.Namespace) -> None:
     for f in failed:
         print(f"  ❌ {f['name']}: {f['error']}")
 
-    if failed and not args.fail_fast:
+    if failed:
         sys.exit(1)
 
 
