@@ -40,12 +40,18 @@ ROLE_WEIGHTS: Dict[str, Dict[str, float]] = {
 # ── Calibration anchors (shared) ──────────────────────────────────────────────
 
 _ANCHORS = """
-Score anchors (use these to calibrate):
-  100 = flawless, ready to use as-is
-   75 = minor omissions or small inaccuracies, still very useful
-   50 = significant gaps or unclear steps, partially useful
-   25 = misleading or mostly incorrect, rarely useful
-    0 = completely wrong or irrelevant
+Score anchors — interpolate between these points:
+  100 = perfect: complete, accurate, specific, immediately usable
+   90 = excellent: tiny wording issues or one minor omission, no impact on usability
+   80 = good: correct and useful, one noticeable gap or slight imprecision
+   70 = acceptable: core answer is right, but missing some context or steps
+   60 = partial: answers part of the question well, ignores another part
+   50 = mediocre: significant gaps, or correct but too vague to act on
+   40 = weak: some useful info but notable inaccuracies or missing key details
+   30 = poor: mostly off-target or incorrect, one or two correct points
+   20 = very poor: nearly all wrong or irrelevant, misleads the user
+   10 = almost useless: one marginally correct detail in an otherwise wrong answer
+    0 = completely wrong, irrelevant, or harmful to follow
 """
 
 # ── Judge role prompts ────────────────────────────────────────────────────────
