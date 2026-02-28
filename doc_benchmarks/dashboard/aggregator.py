@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -109,7 +110,14 @@ class ResultsAggregator:
             logger.warning(f"Cannot read {path}: {e}")
             return None
 
+        if not isinstance(data, dict):
+            logger.warning(f"Invalid snapshot format in {path}: expected JSON object")
+            return None
+
         evaluations = data.get("evaluations", [])
+        if not isinstance(evaluations, list):
+            logger.warning(f"Invalid evaluations format in {path}: expected list")
+            return None
         if not evaluations:
             return None
 
@@ -119,7 +127,10 @@ class ResultsAggregator:
 
         def _as_float(value: Any) -> Optional[float]:
             try:
-                return float(value) if value is not None else None
+                if value is None:
+                    return None
+                v = float(value)
+                return v if math.isfinite(v) else None
             except (TypeError, ValueError):
                 return None
 
