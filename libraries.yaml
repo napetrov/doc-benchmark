@@ -217,34 +217,6 @@ libraries:
     doc_sources:
       - url:https://www.intel.com/content/www/us/en/docs/ipp/developer-reference/2021-12/overview.html
 
-  # ── Video Processing ─────────────────────────────────────────────────────
-
-  onevpl:
-    name: oneVPL (Video Processing Library)
-    description: >
-      oneVPL provides a unified API for hardware-accelerated video encode,
-      decode, and processing. Supports AVC, HEVC, AV1, VP9. Targets Intel
-      Iris Xe graphics and Data Center GPU Flex Series. Replaces Intel Media SDK.
-    repo: oneapi-src/oneVPL
-    context7_id: oneapi-src/onevpl
-    doc_sources:
-      - url:https://spec.oneapi.io/versions/latest/elements/oneVPL/source/index.html
-      - url:https://intel.github.io/libvpl/
-
-  # ── CUDA Migration ────────────────────────────────────────────────────────
-
-  syclomatic:
-    name: SYCLomatic (CUDA to SYCL migration)
-    description: >
-      SYCLomatic is a tool (based on dpct) for migrating CUDA code to SYCL.
-      It automatically translates CUDA API calls, kernel syntax, and memory
-      management to SYCL equivalents. Key topics: migration workflow, manual
-      fixups, supported CUDA APIs, and porting common patterns.
-    repo: oneapi-src/SYCLomatic
-    context7_id: oneapi-src/syclomatic
-    doc_sources:
-      - url:https://oneapi-src.github.io/SYCLomatic/
-
   # ── Python GPU Computing ──────────────────────────────────────────────────
 
   numba_dpex:
@@ -281,3 +253,15 @@ libraries:
       Works without recompilation. Integrates with VTune for full perf+correctness workflow.
     doc_sources:
       - url:https://www.intel.com/content/www/us/en/docs/inspector/user-guide/2024-2/overview.html
+
+  # ── Debugging ─────────────────────────────────────────────────────────────
+
+  gdb_intel:
+    name: Intel Distribution for GDB
+    description: >
+      Intel Distribution for GDB extends GNU GDB with GPU debugging support for
+      Intel Iris Xe, Arc, and Data Center GPU. Features: SIMD lane inspection,
+      GPU thread/work-group debugging, SYCL kernel debugging, breakpoints inside
+      GPU kernels, and integration with oneAPI DevCloud environments.
+    doc_sources:
+      - url:https://www.intel.com/content/www/us/en/docs/distribution-for-gdb/get-started-guide/2024-2/overview.html
