@@ -1,0 +1,63 @@
+# Library registry — known products for doc-benchmark
+# Each entry provides enough context for the LLM to work without guessing.
+# Run: python -m doc_benchmarks benchmark run --library <name>
+# Or:  python -m doc_benchmarks benchmark batch --libraries onetbb,onemkl
+#      python -m doc_benchmarks benchmark batch --all
+
+libraries:
+
+  onetbb:
+    name: oneTBB
+    description: >
+      oneAPI Threading Building Blocks (oneTBB) is a C++ template library for
+      task-based parallelism. It provides parallel algorithms (parallel_for,
+      parallel_reduce, pipeline), concurrent containers, and a task scheduler.
+      Targets multi-core CPU performance for C++ developers.
+    repo: uxlfoundation/oneTBB
+    context7_id: uxlfoundation/onetbb
+    doc_sources:
+      - context7
+      - url:https://spec.oneapi.io/versions/latest/elements/oneTBB/source/index.html
+
+  onemkl:
+    name: oneMKL
+    description: >
+      oneAPI Math Kernel Library (oneMKL) provides highly optimized math routines:
+      BLAS, LAPACK, FFT, random number generators, and sparse solvers. Supports
+      CPU and GPU (SYCL/DPC++) targets. Used in HPC, data science, and ML workloads.
+    repo: oneapi-src/oneMKL
+    context7_id: oneapi-src/onemkl
+    doc_sources:
+      - url:https://spec.oneapi.io/versions/latest/elements/oneMKL/source/index.html
+      - url:https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2024-2/overview.html
+
+  onednn:
+    name: oneDNN
+    description: >
+      oneAPI Deep Neural Network Library (oneDNN) is an open-source performance
+      library for deep learning. Provides primitives for convolutions, pooling,
+      batch normalization, RNN, and more. Used by TensorFlow, PyTorch, OpenVINO.
+    repo: oneapi-src/oneDNN
+    context7_id: oneapi-src/onednn
+    doc_sources:
+      - url:https://oneapi-src.github.io/oneDNN/
+
+  onedpl:
+    name: oneDPL
+    description: >
+      oneAPI DPC++ Library (oneDPL) extends C++ STL algorithms for parallel and
+      heterogeneous execution (CPU, GPU via SYCL). Provides parallel STL,
+      async algorithms, and random number generators for DPC++ programs.
+    repo: uxlfoundation/oneDPL
+    context7_id: uxlfoundation/onedpl
+    doc_sources:
+      - url:https://uxlfoundation.github.io/oneDPL/
+
+  openmp:
+    name: Intel OpenMP Runtime
+    description: >
+      Intel's OpenMP runtime library (libomp) provides OpenMP 5.x support for
+      C, C++, and Fortran. Key features: thread affinity, NUMA support, offload
+      to GPU, and tuning environment variables (OMP_NUM_THREADS, KMP_AFFINITY).
+    doc_sources:
+      - url:https://www.intel.com/content/www/us/en/docs/openmp-runtime/developer-guide-reference/2024-2/overview.html
