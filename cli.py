@@ -553,6 +553,10 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
     """Run full evaluation pipeline (orchestrator)."""
     from doc_benchmarks.orchestrator import EvaluationPipeline
 
+    if not getattr(args, "repo", None) and not getattr(args, "description", None):
+        print("Error: either --repo or --description must be provided.", file=sys.stderr)
+        sys.exit(1)
+
     print(f"Starting full evaluation pipeline for {args.product}")
     if args.repo:
         print(f"Repository: {args.repo}")
@@ -708,7 +712,7 @@ def build_parser() -> argparse.ArgumentParser:
     personas_sub = personas_p.add_subparsers(dest="personas_cmd", required=True)
     
     # personas discover
-    discover_p = personas_sub.add_parser("discover", help="Auto-discover personas from GitHub repo")
+    discover_p = personas_sub.add_parser("discover", help="Discover personas from a GitHub repo or product description")
     discover_p.add_argument("--product", required=True, help="Product name (e.g., oneTBB)")
     discover_p.add_argument("--repo", default=None, help="GitHub repo (e.g., uxlfoundation/oneTBB). Optional if --description is given.")
     discover_p.add_argument("--description", default=None, help="Plain-text product description (used when --repo is not available).")
