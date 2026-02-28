@@ -352,7 +352,7 @@ def cmd_questions_analyze(args: argparse.Namespace) -> None:
 
     questions_data = json.loads(Path(args.questions).read_text())
     questions = questions_data.get("questions", questions_data)
-    if isinstance(questions[0], dict):
+    if questions and isinstance(questions[0], dict):
         questions = [q.get("question", q.get("text", str(q))) for q in questions]
 
     print(f"Analyzing {len(questions)} questions for '{args.product}'...")
