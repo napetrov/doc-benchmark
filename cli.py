@@ -548,13 +548,23 @@ def cmd_eval_panel_score(args: argparse.Namespace) -> None:
     judges = [JudgeConfig(role=r, model=args.model, provider=args.provider) for r in roles]
     panel = JudgePanel(judges=judges, concurrency=args.concurrency)
 
-    answers_data = json.loads(Path(args.answers).read_text())
-    answers = answers_data.get("answers", answers_data)
-    print(f"Panel evaluation: {len(answers)} answers × {len(judges)} judges → {len(answers) * len(judges)} LLM calls")
+    try:
+        answers_data = json.loads(Path(args.answers).read_text())
+    except FileNotFoundError:
+        print(f"Error: answers file not found: {args.answers}", file=sys.stderr)
+        sys.exit(1)
+    answers = answers_data.get("answers", answers_data) if isinstance(answers_data, dict) else answers_data
+    if not isinstance(answers, list):
+        print(f"Error: expected a list of answers in {args.answers}", file=sys.stderr)
+        sys.exit(1)
+    n_effective = min(len(answers), args.limit) if args.limit else len(answers)
+    print(f"Panel evaluation: {n_effective} answers × {len(judges)} judges → {n_effective * len(judges)} LLM calls")
     print(f"Roles: {', '.join(roles)}\nModel: {args.provider}/{args.model}\n")
 
     output_path = Path(args.output) if args.output else Path(f"eval/{args.product}_panel.json")
-    results = panel.evaluate_answers(answers, library_name=args.product, output_path=output_path)
+    results = panel.evaluate_answers(answers, library_name=args.product,
+                                     output_path=output_path,
+                                     limit=getattr(args, "limit", None))
 
     # Summary
     valid = [r for r in results if r.get("with_docs") and r["with_docs"].get("aggregate") is not None]
@@ -884,6 +894,8 @@ def build_parser() -> argparse.ArgumentParser:
                          help="Comma-separated judge roles (default: technical_expert,developer_advocate,doc_reviewer)")
     panel_p.add_argument("--concurrency", type=positive_int, default=6,
                          help="Parallel judge API calls (default: 6)")
+    panel_p.add_argument("--limit", type=positive_int, default=None,
+                         help="Evaluate only first N answers (useful for testing)")
     panel_p.set_defaults(func=cmd_eval_panel_score)
 
     # library subcommand group

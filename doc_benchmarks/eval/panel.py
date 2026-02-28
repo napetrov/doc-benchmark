@@ -1,15 +1,12 @@
 """Multi-evaluator (LLM Judge Panel) for doc-benchmark.
 
-Runs N judges with different roles in parallel and computes:
-- Per-judge scores
-- Mean aggregate score across judges
-- Standard deviation (spread)
-- Inter-rater agreement score (1 - normalized_std, 0-1)
-
-Each judge role weights dimensions differently, ensuring genuine diversity:
-- technical_expert:    correctness × 2, specificity × 1.5
-- developer_advocate:  actionability × 2, code_quality × 1.5
-- doc_reviewer:        completeness × 2, specificity × 1.5
+Design principles:
+- Roles are differentiated in BOTH criteria perspective AND weighted aggregate
+- LLM outputs only 5 raw scores; Python computes weighted aggregate (reliable)
+- reasoning comes FIRST in JSON (chain-of-thought anchors the scores)
+- code_quality = 100 when no code present (avoids penalizing text-only answers)
+- JSON extracted via regex (robust against leading text from LLM)
+- Prompts use __PLACEHOLDER__ substitution (safe from .format() conflicts)
 """
 
 from __future__ import annotations
@@ -18,6 +15,7 @@ import json
 import logging
 import math
 import os
+import re
 import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -28,85 +26,90 @@ from doc_benchmarks.llm import llm_call
 
 logger = logging.getLogger(__name__)
 
-# ── Judge role prompts ────────────────────────────────────────────────────────
+# ── Score fields & weights ────────────────────────────────────────────────────
 
-# Use string Template to avoid .format() conflicts with user content
-_ROLE_INTROS: Dict[str, str] = {
-    "technical_expert": (
-        "You are a STRICT TECHNICAL EXPERT evaluating documentation answers. "
-        "Your primary concern is FACTUAL ACCURACY and TECHNICAL DEPTH. "
-        "Penalize vague, hand-wavy, or technically wrong answers heavily — "
-        "even if they sound helpful. A wrong answer scores < 40 on correctness "
-        "regardless of how well-written it is."
-    ),
-    "developer_advocate": (
-        "You are a DEVELOPER ADVOCATE evaluating documentation answers. "
-        "Your primary concern is PRACTICAL USEFULNESS: would a developer be "
-        "unblocked by this answer right now? Prioritize working code examples "
-        "and clear actionable steps. A theoretically correct but hard-to-apply "
-        "answer scores < 50 on actionability."
-    ),
-    "doc_reviewer": (
-        "You are a DOCUMENTATION QUALITY REVIEWER. "
-        "Your primary concern is COMPLETENESS and FIDELITY TO THE DOCS. "
-        "Check whether the answer covers all aspects of the question and stays "
-        "within the scope of the provided context. An answer that ignores key "
-        "parts of the question scores < 40 on completeness."
-    ),
+SCORE_FIELDS = ("correctness", "completeness", "specificity", "code_quality", "actionability")
+
+# Weights per role — Python computes aggregate, not LLM
+ROLE_WEIGHTS: Dict[str, Dict[str, float]] = {
+    "technical_expert":   {"correctness": 2.0, "completeness": 1.0, "specificity": 1.5, "code_quality": 1.0, "actionability": 1.0},
+    "developer_advocate": {"correctness": 1.0, "completeness": 1.0, "specificity": 1.0, "code_quality": 1.5, "actionability": 2.0},
+    "doc_reviewer":       {"correctness": 1.0, "completeness": 2.0, "specificity": 1.5, "code_quality": 1.0, "actionability": 1.0},
 }
 
-_WEIGHTED_AGGREGATE: Dict[str, str] = {
-    "technical_expert": (
-        "Compute aggregate as: (correctness×2 + completeness + specificity×1.5 + "
-        "code_quality + actionability) / 6.5, rounded to nearest integer."
-    ),
-    "developer_advocate": (
-        "Compute aggregate as: (correctness + completeness + specificity + "
-        "code_quality×1.5 + actionability×2) / 6.5, rounded to nearest integer."
-    ),
-    "doc_reviewer": (
-        "Compute aggregate as: (correctness + completeness×2 + specificity×1.5 + "
-        "code_quality + actionability) / 6.5, rounded to nearest integer."
-    ),
-}
+# ── Calibration anchors (shared) ──────────────────────────────────────────────
 
-_CRITERIA = """
-Rate each dimension 0-100:
-1. correctness   — Is the answer factually accurate?
-2. completeness  — Does it fully address all parts of the question?
-3. specificity   — Is it specific to THIS library (not generic advice)?
-4. code_quality  — If code is included: is it correct, runnable, idiomatic?
-5. actionability — Can the user directly apply this to their problem?
-
-{weighted_aggregate}
-
-Output ONLY a JSON object. No markdown, no explanation:
-{json_schema}
+_ANCHORS = """
+Score anchors (use these to calibrate):
+  100 = flawless, ready to use as-is
+   75 = minor omissions or small inaccuracies, still very useful
+   50 = significant gaps or unclear steps, partially useful
+   25 = misleading or mostly incorrect, rarely useful
+    0 = completely wrong or irrelevant
 """
 
-_JSON_SCHEMA = ('{"correctness": 0-100, "completeness": 0-100, "specificity": 0-100, '
-                '"code_quality": 0-100, "actionability": 0-100, "aggregate": 0-100, '
-                '"reasoning": "one sentence explaining the main strength or weakness"}')
+# ── Judge role prompts ────────────────────────────────────────────────────────
+
+_ROLE_INTROS: Dict[str, str] = {
+    "technical_expert": (
+        "You are a STRICT TECHNICAL EXPERT evaluating a documentation answer.\n"
+        "PRIMARY CONCERN: FACTUAL ACCURACY and TECHNICAL DEPTH.\n"
+        "- Penalize vague, hand-wavy, or technically incorrect details heavily.\n"
+        "- A wrong answer scores ≤ 40 on correctness even if well-written.\n"
+        "- Judge 'specificity' harshly: generic advice not tied to __LIBRARY__ scores ≤ 30.\n"
+        "- For 'completeness': does it address ALL parts of the question?\n"
+        "- For 'actionability': as a technical expert, would YOU use this answer?"
+    ),
+    "developer_advocate": (
+        "You are a DEVELOPER ADVOCATE evaluating a documentation answer.\n"
+        "PRIMARY CONCERN: PRACTICAL USEFULNESS — would a developer be unblocked right now?\n"
+        "- A theoretically correct but hard-to-apply answer scores ≤ 40 on actionability.\n"
+        "- Prioritize working code examples and clear step-by-step instructions.\n"
+        "- For 'correctness': acceptable if minor inaccuracies don't affect usability.\n"
+        "- For 'completeness': enough to get started? Partial answers can score 70+ if actionable."
+    ),
+    "doc_reviewer": (
+        "You are a DOCUMENTATION QUALITY REVIEWER evaluating a documentation answer.\n"
+        "PRIMARY CONCERN: COMPLETENESS and FIDELITY TO THE PROVIDED CONTEXT.\n"
+        "- An answer ignoring key aspects of the question scores ≤ 40 on completeness.\n"
+        "- Check: does the answer stay within the scope of the provided documentation context?\n"
+        "- Penalize answers that introduce information NOT present in the context.\n"
+        "- For 'specificity': does it reference __LIBRARY__-specific APIs, not generic patterns?"
+    ),
+}
+
+_PROMPT_TEMPLATE = """\
+__ROLE_INTRO__
+
+Library: __LIBRARY__
+Question: __QUESTION__
+Answer: __ANSWER__
+Documentation context: __CONTEXT__
+
+Rate each dimension 0–100. Use these calibration anchors:
+__ANCHORS__
+
+Dimensions to rate:
+1. correctness   — Is the answer factually accurate for __LIBRARY__?
+2. completeness  — Does it address ALL parts of the question?
+3. specificity   — Is it specific to __LIBRARY__ (not generic)?
+4. code_quality  — Is the code correct, runnable, idiomatic __LIBRARY__ code?
+                   IF NO CODE IN THE ANSWER: set code_quality = 100 (not applicable).
+5. actionability — Can the user directly apply this to their problem right now?
+
+IMPORTANT: Output ONLY a JSON object. Do NOT wrap in markdown. Do NOT add any text before or after.
+Put "reasoning" FIRST (it helps you think before scoring):
+{"reasoning": "one sentence: main strength or weakness", "correctness": N, "completeness": N, "specificity": N, "code_quality": N, "actionability": N}
+"""
 
 JUDGE_ROLES: Dict[str, str] = {
-    role: (
-        _ROLE_INTROS[role] + "\n\n"
-        "Library: __LIBRARY__\n"
-        "Question: __QUESTION__\n"
-        "Answer: __ANSWER__\n"
-        "Context (from docs): __CONTEXT__\n"
-        + _CRITERIA.format(
-            weighted_aggregate=_WEIGHTED_AGGREGATE[role],
-            json_schema=_JSON_SCHEMA,
-        )
-    )
-    for role in _ROLE_INTROS
+    role: _PROMPT_TEMPLATE
+    .replace("__ROLE_INTRO__", intro)
+    .replace("__ANCHORS__", _ANCHORS)
+    for role, intro in _ROLE_INTROS.items()
 }
 
 DEFAULT_PANEL = ["technical_expert", "developer_advocate", "doc_reviewer"]
-
-SCORE_FIELDS = ("correctness", "completeness", "specificity", "code_quality", "actionability", "aggregate")
-
 
 # ── Data classes ──────────────────────────────────────────────────────────────
 
@@ -115,18 +118,14 @@ class JudgeVote:
     role: str
     model: str
     provider: str
-    scores: Dict[str, float]
+    scores: Dict[str, float]    # raw scores only (no aggregate — computed by Python)
     reasoning: str
+    aggregate: Optional[float] = None   # Python-computed weighted aggregate
     error: Optional[str] = None
-
-    @property
-    def aggregate(self) -> Optional[float]:
-        return self.scores.get("aggregate") if not self.error else None
 
 
 @dataclass
 class PanelVerdict:
-    """Aggregated verdict from all judges."""
     votes: List[JudgeVote]
     mean_aggregate: Optional[float]
     std_aggregate: Optional[float]
@@ -139,7 +138,6 @@ class PanelVerdict:
 
     @property
     def disagreement_flag(self) -> bool:
-        """True when judges disagree significantly (std > 15 points)."""
         return self.std_aggregate is not None and self.std_aggregate > 15.0
 
 
@@ -171,6 +169,8 @@ class JudgePanel:
     def _build_prompt(self, role: str, question: str, answer: str,
                       library_name: str, context: str) -> str:
         template = JUDGE_ROLES.get(role, JUDGE_ROLES["technical_expert"])
+        # Use sequential replace with unique sentinels to avoid injection
+        # (each placeholder is distinct so no cross-substitution is possible)
         return (
             template
             .replace("__LIBRARY__", library_name)
@@ -179,55 +179,60 @@ class JudgePanel:
             .replace("__CONTEXT__", context or "(No documentation provided)")
         )
 
-    def _call_judge(
-        self,
-        config: JudgeConfig,
-        question: str,
-        answer: str,
-        library_name: str,
-        context: str,
-    ) -> JudgeVote:
+    @staticmethod
+    def _compute_aggregate(role: str, scores: Dict[str, float]) -> float:
+        """Compute weighted aggregate in Python — never trust LLM to do math."""
+        weights = ROLE_WEIGHTS.get(role, {k: 1.0 for k in SCORE_FIELDS})
+        total_weight = sum(weights.values())
+        weighted_sum = sum(scores.get(k, 0.0) * weights.get(k, 1.0) for k in SCORE_FIELDS)
+        return round(weighted_sum / total_weight, 1)
+
+    @staticmethod
+    def _extract_json(text: str) -> Dict:
+        """Robust JSON extraction — handles leading text and markdown fences."""
+        # Try direct parse first
+        try:
+            return json.loads(text.strip())
+        except json.JSONDecodeError:
+            pass
+        # Extract from markdown fence
+        fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if fence:
+            try:
+                return json.loads(fence.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+        # Find first { ... } block
+        brace = re.search(r"\{[\s\S]*\}", text)
+        if brace:
+            return json.loads(brace.group(0))
+        raise ValueError(f"No JSON found in LLM response: {text[:200]!r}")
+
+    def _call_judge(self, config: JudgeConfig, question: str, answer: str,
+                    library_name: str, context: str) -> JudgeVote:
         prompt = self._build_prompt(config.role, question, answer, library_name, context)
         try:
             raw = llm_call(prompt, model=config.model, provider=config.provider)
-            text = raw.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            data = json.loads(text.strip())
-            scores = {}
+            data = self._extract_json(raw)
+            scores: Dict[str, float] = {}
             for k in SCORE_FIELDS:
                 if k in data:
-                    val = float(data[k])
-                    # Clamp to valid range
-                    scores[k] = max(0.0, min(100.0, val))
+                    scores[k] = max(0.0, min(100.0, float(data[k])))
+            # Python computes aggregate (ignores any aggregate LLM might have returned)
+            agg = self._compute_aggregate(config.role, scores) if scores else None
             return JudgeVote(
-                role=config.role,
-                model=config.model,
-                provider=config.provider,
-                scores=scores,
-                reasoning=str(data.get("reasoning", "")),
+                role=config.role, model=config.model, provider=config.provider,
+                scores=scores, reasoning=str(data.get("reasoning", "")), aggregate=agg,
             )
         except Exception as exc:
             logger.warning(f"Judge '{config.role}' ({config.model}) failed: {exc}")
             return JudgeVote(
-                role=config.role,
-                model=config.model,
-                provider=config.provider,
-                scores={},
-                reasoning="",
-                error=str(exc),
+                role=config.role, model=config.model, provider=config.provider,
+                scores={}, reasoning="", error=str(exc),
             )
 
-    def evaluate(
-        self,
-        question: str,
-        answer: str,
-        library_name: str,
-        context: str = "",
-    ) -> PanelVerdict:
-        """Run all judges concurrently and return aggregated verdict."""
+    def evaluate(self, question: str, answer: str, library_name: str,
+                 context: str = "") -> PanelVerdict:
         votes: List[JudgeVote] = []
         with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
             futures = {
@@ -243,75 +248,54 @@ class JudgePanel:
         if not valid:
             return PanelVerdict(votes=votes, mean_aggregate=None,
                                 std_aggregate=None, agreement_score=None)
-
         aggs = [v.aggregate for v in valid]
         mean_agg = round(statistics.mean(aggs), 1)
         std_agg = round(statistics.stdev(aggs), 1) if len(aggs) > 1 else 0.0
         agreement = round(max(0.0, 1.0 - std_agg / 50.0), 3)
-
-        dims = ("correctness", "completeness", "specificity", "code_quality", "actionability")
         mean_dims: Dict[str, float] = {}
-        for dim in dims:
+        for dim in SCORE_FIELDS:
             vals = [v.scores[dim] for v in valid if dim in v.scores]
             if vals:
                 mean_dims[dim] = round(statistics.mean(vals), 1)
+        return PanelVerdict(votes=votes, mean_aggregate=mean_agg,
+                            std_aggregate=std_agg, agreement_score=agreement,
+                            mean_dimensions=mean_dims)
 
-        return PanelVerdict(
-            votes=votes,
-            mean_aggregate=mean_agg,
-            std_aggregate=std_agg,
-            agreement_score=agreement,
-            mean_dimensions=mean_dims,
-        )
-
-    def evaluate_answers(
-        self,
-        answers: List[Dict[str, Any]],
-        library_name: str,
-        output_path: Optional[Path] = None,
-    ) -> List[Dict[str, Any]]:
-        """Evaluate a full answers list with panel scoring."""
-        results = []
-        n = len(answers)
-
-        for i, answer in enumerate(answers, 1):
-            q_id = answer.get("question_id", f"q{i}")
-            question = answer.get("question", "")
-            print(f"[{i}/{n}] Panel: {q_id}…", flush=True)
-
-            with_verdict = self._score_answer_entry(answer.get("with_docs"), question, library_name)
-            without_verdict = self._score_answer_entry(answer.get("without_docs"), question, library_name)
-
-            delta = None
-            if (with_verdict and with_verdict.mean_aggregate is not None
-                    and without_verdict and without_verdict.mean_aggregate is not None):
-                delta = round(with_verdict.mean_aggregate - without_verdict.mean_aggregate, 1)
-
-            result = {
-                "question_id": q_id,
-                "question": question,
-                "panel_size": len(self.judges),
-                "with_docs": _verdict_to_dict(with_verdict),
-                "without_docs": _verdict_to_dict(without_verdict),
-                "delta": delta,
-            }
-            results.append(result)
-
-            if output_path:
-                _save_incremental(results, output_path, library_name, self)
-
-        return results
-
-    def _score_answer_entry(
-        self,
-        ans_data: Optional[Dict[str, Any]],
-        question: str,
-        library_name: str,
-    ) -> Optional[PanelVerdict]:
+    def _score_answer_entry(self, ans_data: Optional[Dict], question: str,
+                            library_name: str) -> Optional[PanelVerdict]:
         if not ans_data or not ans_data.get("answer"):
             return None
         ctx = "\n".join(d.get("content", "") for d in ans_data.get("retrieved_docs", []))
         return self.evaluate(question, ans_data["answer"], library_name, ctx)
+
+    def evaluate_answers(self, answers: List[Dict[str, Any]], library_name: str,
+                         output_path: Optional[Path] = None,
+                         limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        if limit:
+            answers = answers[:limit]
+        results = []
+        n = len(answers)
+        for i, answer in enumerate(answers, 1):
+            q_id = answer.get("question_id", f"q{i}")
+            question = answer.get("question", "")
+            print(f"[{i}/{n}] Panel: {q_id}…", flush=True)
+            with_v = self._score_answer_entry(answer.get("with_docs"), question, library_name)
+            without_v = self._score_answer_entry(answer.get("without_docs"), question, library_name)
+            delta = None
+            if (with_v and with_v.mean_aggregate is not None
+                    and without_v and without_v.mean_aggregate is not None):
+                delta = round(with_v.mean_aggregate - without_v.mean_aggregate, 1)
+            results.append({
+                "question_id": q_id,
+                "question": question,
+                "panel_size": len(self.judges),
+                "with_docs": _verdict_to_dict(with_v),
+                "without_docs": _verdict_to_dict(without_v),
+                "delta": delta,
+            })
+            if output_path:
+                _save_incremental(results, output_path, library_name, self)
+        return results
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -326,25 +310,25 @@ def _verdict_to_dict(v: Optional[PanelVerdict]) -> Optional[Dict[str, Any]]:
         "disagreement_flag": v.disagreement_flag,
         "dimensions": v.mean_dimensions,
         "votes": [
-            {
-                "role": vote.role,
-                "model": vote.model,
-                "aggregate": vote.aggregate,
-                "scores": vote.scores,
-                "reasoning": vote.reasoning,
-                "error": vote.error,
-            }
-            for vote in v.votes
+            {"role": vt.role, "model": vt.model, "aggregate": vt.aggregate,
+             "scores": vt.scores, "reasoning": vt.reasoning, "error": vt.error}
+            for vt in v.votes
         ],
     }
 
 
-def _save_incremental(results: List[Dict], path: Path, library_name: str, panel: JudgePanel) -> None:
+def _save_incremental(results: List[Dict], path: Path, library_name: str,
+                      panel: JudgePanel) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     output = {
         "evaluated_at": _timestamp(),
         "judge_model": f"panel({len(panel.judges)})",
+        "panel_config": {
+            "size": len(panel.judges),
+            "roles": [j.role for j in panel.judges],
+            "models": [f"{j.provider}/{j.model}" for j in panel.judges],
+        },
         "library_name": library_name,
         "total_evaluations": len(results),
         "evaluations": results,

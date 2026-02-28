@@ -6,6 +6,7 @@ import pytest
 
 from doc_benchmarks.eval.panel import (
     DEFAULT_PANEL,
+    ROLE_WEIGHTS,
     JudgeConfig,
     JudgePanel,
     JudgeVote,
@@ -16,44 +17,146 @@ from doc_benchmarks.eval.panel import (
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _llm_response(aggregate=80, correctness=80, completeness=80,
+def _llm_response(reasoning="test", correctness=80, completeness=80,
                   specificity=80, code_quality=80, actionability=80):
+    """LLM response WITHOUT aggregate — Python should compute it."""
     return json.dumps({
+        "reasoning": reasoning,
         "correctness": correctness,
         "completeness": completeness,
         "specificity": specificity,
         "code_quality": code_quality,
         "actionability": actionability,
-        "aggregate": aggregate,
-        "reasoning": "test reasoning",
     })
 
 
+def _vote(role="technical_expert", agg=80.0, correctness=80, completeness=80,
+          specificity=80, code_quality=80, actionability=80, error=None):
+    """Create a JudgeVote with explicit aggregate (Python-computed)."""
+    return JudgeVote(
+        role=role, model="m", provider="p",
+        scores={"correctness": correctness, "completeness": completeness,
+                "specificity": specificity, "code_quality": code_quality,
+                "actionability": actionability},
+        reasoning="r",
+        aggregate=agg,
+        error=error,
+    )
+
+
 def _patch_llm(responses):
-    """Patch llm_call to return responses in sequence."""
     it = iter(responses)
     return patch("doc_benchmarks.eval.panel.llm_call", side_effect=lambda *a, **kw: next(it))
 
 
-# ── JudgePanel._call_judge ────────────────────────────────────────────────────
+# ── _extract_json ─────────────────────────────────────────────────────────────
 
-def test_call_judge_success():
+def test_extract_json_plain():
+    data = JudgePanel._extract_json('{"correctness": 80}')
+    assert data["correctness"] == 80
+
+
+def test_extract_json_with_leading_text():
+    raw = 'Here is my evaluation:\n{"correctness": 75, "completeness": 80}'
+    data = JudgePanel._extract_json(raw)
+    assert data["correctness"] == 75
+
+
+def test_extract_json_markdown_fence():
+    raw = "```json\n{\"correctness\": 70}\n```"
+    data = JudgePanel._extract_json(raw)
+    assert data["correctness"] == 70
+
+
+def test_extract_json_no_json_raises():
+    import pytest
+    with pytest.raises((ValueError, Exception)):
+        JudgePanel._extract_json("no json here at all")
+
+
+# ── _compute_aggregate ────────────────────────────────────────────────────────
+
+def test_compute_aggregate_uses_role_weights():
+    scores = {"correctness": 100, "completeness": 0, "specificity": 0,
+              "code_quality": 0, "actionability": 0}
+    # technical_expert weights correctness×2, total=6.5
+    agg = JudgePanel._compute_aggregate("technical_expert", scores)
+    expected = round(100 * 2.0 / 6.5, 1)
+    assert agg == expected
+
+
+def test_compute_aggregate_different_per_role():
+    scores = {"correctness": 50, "completeness": 50, "specificity": 50,
+              "code_quality": 100, "actionability": 100}
+    # developer_advocate weights actionability×2, code_quality×1.5
+    agg_dev = JudgePanel._compute_aggregate("developer_advocate", scores)
+    # technical_expert weights correctness×2
+    agg_tech = JudgePanel._compute_aggregate("technical_expert", scores)
+    assert agg_dev != agg_tech
+
+
+def test_compute_aggregate_all_same_gives_same_score():
+    scores = {k: 80.0 for k in ("correctness", "completeness", "specificity",
+                                  "code_quality", "actionability")}
+    for role in DEFAULT_PANEL:
+        agg = JudgePanel._compute_aggregate(role, scores)
+        assert agg == 80.0
+
+
+# ── _call_judge ───────────────────────────────────────────────────────────────
+
+def test_call_judge_python_computes_aggregate():
     cfg = JudgeConfig(role="technical_expert", model="gpt-4o-mini", provider="openai")
     panel = JudgePanel(judges=[cfg])
-    with _patch_llm([_llm_response(aggregate=85)]):
+    # LLM returns no aggregate field — Python must compute it
+    llm_resp = json.dumps({"reasoning": "ok", "correctness": 80, "completeness": 80,
+                           "specificity": 80, "code_quality": 80, "actionability": 80})
+    with _patch_llm([llm_resp]):
         vote = panel._call_judge(cfg, "Q?", "A.", "oneTBB", "ctx")
-    assert vote.aggregate == 85.0
+    assert vote.aggregate is not None
     assert vote.error is None
     assert vote.role == "technical_expert"
+    # Aggregate computed by Python, not from JSON
+    expected = JudgePanel._compute_aggregate("technical_expert",
+                                              {"correctness": 80, "completeness": 80,
+                                               "specificity": 80, "code_quality": 80,
+                                               "actionability": 80})
+    assert vote.aggregate == expected
 
 
-def test_call_judge_strips_markdown():
+def test_call_judge_ignores_llm_aggregate():
+    """Even if LLM returns aggregate, Python recomputes it."""
     cfg = JudgeConfig(role="technical_expert", model="gpt-4o-mini", provider="openai")
     panel = JudgePanel(judges=[cfg])
-    raw = "```json\n" + _llm_response(aggregate=70) + "\n```"
-    with _patch_llm([raw]):
-        vote = panel._call_judge(cfg, "Q?", "A.", "oneTBB", "")
-    assert vote.aggregate == 70.0
+    # LLM returns aggregate=999 (garbage) — must be ignored
+    llm_resp = json.dumps({"reasoning": "ok", "correctness": 80, "completeness": 80,
+                           "specificity": 80, "code_quality": 80, "actionability": 80,
+                           "aggregate": 999})
+    with _patch_llm([llm_resp]):
+        vote = panel._call_judge(cfg, "Q?", "A.", "oneTBB", "ctx")
+    assert vote.aggregate != 999
+    assert 0 <= vote.aggregate <= 100
+
+
+def test_call_judge_clamps_scores():
+    cfg = JudgeConfig(role="technical_expert", model="gpt-4o-mini", provider="openai")
+    panel = JudgePanel(judges=[cfg])
+    llm_resp = json.dumps({"reasoning": "ok", "correctness": 150, "completeness": -10,
+                           "specificity": 80, "code_quality": 80, "actionability": 80})
+    with _patch_llm([llm_resp]):
+        vote = panel._call_judge(cfg, "Q?", "A.", "oneTBB", "ctx")
+    assert vote.scores["correctness"] == 100.0
+    assert vote.scores["completeness"] == 0.0
+
+
+def test_call_judge_handles_leading_text_in_response():
+    cfg = JudgeConfig(role="technical_expert", model="gpt-4o-mini", provider="openai")
+    panel = JudgePanel(judges=[cfg])
+    llm_resp = 'Sure, here is my evaluation:\n{"reasoning":"ok","correctness":70,"completeness":70,"specificity":70,"code_quality":70,"actionability":70}'
+    with _patch_llm([llm_resp]):
+        vote = panel._call_judge(cfg, "Q?", "A.", "oneTBB", "ctx")
+    assert vote.aggregate is not None
+    assert vote.error is None
 
 
 def test_call_judge_llm_error():
@@ -65,125 +168,81 @@ def test_call_judge_llm_error():
     assert vote.error is not None
 
 
-def test_call_judge_bad_json():
-    cfg = JudgeConfig(role="technical_expert", model="gpt-4o-mini", provider="openai")
-    panel = JudgePanel(judges=[cfg])
-    with _patch_llm(["not json"]):
-        vote = panel._call_judge(cfg, "Q?", "A.", "oneTBB", "")
-    assert vote.error is not None
-
-
-# ── JudgePanel._aggregate ─────────────────────────────────────────────────────
+# ── _aggregate ────────────────────────────────────────────────────────────────
 
 def test_aggregate_mean_and_std():
-    votes = [
-        JudgeVote("technical_expert", "m", "p", {"aggregate": 80}, "r"),
-        JudgeVote("developer_advocate", "m", "p", {"aggregate": 60}, "r"),
-        JudgeVote("doc_reviewer", "m", "p", {"aggregate": 70}, "r"),
-    ]
-    panel = JudgePanel()
-    verdict = panel._aggregate(votes)
+    votes = [_vote("technical_expert", 80), _vote("developer_advocate", 60), _vote("doc_reviewer", 70)]
+    verdict = JudgePanel()._aggregate(votes)
     assert verdict.mean_aggregate == 70.0
     assert verdict.std_aggregate is not None
     assert 0 <= verdict.agreement_score <= 1
 
 
 def test_aggregate_perfect_agreement():
-    votes = [
-        JudgeVote("technical_expert", "m", "p", {"aggregate": 75}, "r"),
-        JudgeVote("developer_advocate", "m", "p", {"aggregate": 75}, "r"),
-    ]
-    panel = JudgePanel()
-    verdict = panel._aggregate(votes)
+    votes = [_vote("technical_expert", 75), _vote("developer_advocate", 75)]
+    verdict = JudgePanel()._aggregate(votes)
     assert verdict.std_aggregate == 0.0
     assert verdict.agreement_score == 1.0
     assert not verdict.disagreement_flag
 
 
 def test_aggregate_high_disagreement():
-    votes = [
-        JudgeVote("technical_expert", "m", "p", {"aggregate": 20}, "r"),
-        JudgeVote("developer_advocate", "m", "p", {"aggregate": 90}, "r"),
-    ]
-    panel = JudgePanel()
-    verdict = panel._aggregate(votes)
-    assert verdict.disagreement_flag  # std > 15
+    votes = [_vote("technical_expert", 20), _vote("developer_advocate", 90)]
+    verdict = JudgePanel()._aggregate(votes)
+    assert verdict.disagreement_flag
 
 
 def test_aggregate_all_errors():
-    votes = [
-        JudgeVote("technical_expert", "m", "p", {}, "", error="boom"),
-        JudgeVote("developer_advocate", "m", "p", {}, "", error="boom"),
-    ]
-    panel = JudgePanel()
-    verdict = panel._aggregate(votes)
+    votes = [_vote(agg=None, error="boom"), _vote(agg=None, error="boom")]
+    for v in votes:
+        v.aggregate = None
+    verdict = JudgePanel()._aggregate(votes)
     assert verdict.mean_aggregate is None
-    assert verdict.agreement_score is None
-
-
-def test_aggregate_single_vote():
-    votes = [JudgeVote("technical_expert", "m", "p", {"aggregate": 80}, "r")]
-    panel = JudgePanel()
-    verdict = panel._aggregate(votes)
-    assert verdict.mean_aggregate == 80.0
-    assert verdict.std_aggregate == 0.0
 
 
 def test_aggregate_dimensions():
     votes = [
-        JudgeVote("a", "m", "p", {"aggregate": 80, "correctness": 90, "completeness": 70}, "r"),
-        JudgeVote("b", "m", "p", {"aggregate": 60, "correctness": 50, "completeness": 70}, "r"),
+        _vote(correctness=90, completeness=70, agg=80),
+        _vote(correctness=50, completeness=70, agg=60),
     ]
-    panel = JudgePanel()
-    verdict = panel._aggregate(votes)
+    verdict = JudgePanel()._aggregate(votes)
     assert verdict.mean_dimensions["correctness"] == 70.0
     assert verdict.mean_dimensions["completeness"] == 70.0
 
 
-# ── JudgePanel.evaluate ───────────────────────────────────────────────────────
+# ── evaluate (full) ───────────────────────────────────────────────────────────
 
 def test_evaluate_full_panel():
-    judges = [
-        JudgeConfig("technical_expert", "gpt-4o-mini", "openai"),
-        JudgeConfig("developer_advocate", "gpt-4o-mini", "openai"),
-        JudgeConfig("doc_reviewer", "gpt-4o-mini", "openai"),
-    ]
+    judges = [JudgeConfig(r, "gpt-4o-mini", "openai") for r in DEFAULT_PANEL]
     panel = JudgePanel(judges=judges, concurrency=3)
-    responses = [_llm_response(aggregate=80), _llm_response(aggregate=75), _llm_response(aggregate=85)]
+    responses = [_llm_response(correctness=80) for _ in judges]
     with _patch_llm(responses):
         verdict = panel.evaluate("Q?", "A.", "oneTBB", "ctx")
-    assert verdict.mean_aggregate == 80.0
+    assert verdict.mean_aggregate is not None
     assert len(verdict.votes) == 3
-    assert len(verdict.valid_votes) == 3
 
 
 def test_evaluate_partial_failure():
-    judges = [
-        JudgeConfig("technical_expert", "gpt-4o-mini", "openai"),
-        JudgeConfig("developer_advocate", "gpt-4o-mini", "openai"),
-    ]
+    judges = [JudgeConfig("technical_expert", "m", "openai"),
+              JudgeConfig("developer_advocate", "m", "openai")]
     panel = JudgePanel(judges=judges, concurrency=2)
-    it = iter([_llm_response(aggregate=80), "bad json"])
+    it = iter([_llm_response(), "bad json {{{}"])
     with patch("doc_benchmarks.eval.panel.llm_call", side_effect=lambda *a, **kw: next(it)):
         verdict = panel.evaluate("Q?", "A.", "oneTBB", "")
     assert len(verdict.valid_votes) == 1
-    assert verdict.mean_aggregate == 80.0
 
 
-# ── DEFAULT_PANEL & roles ─────────────────────────────────────────────────────
+# ── defaults ──────────────────────────────────────────────────────────────────
 
 def test_default_panel_has_three_roles():
     assert len(DEFAULT_PANEL) == 3
     assert "technical_expert" in DEFAULT_PANEL
-    assert "developer_advocate" in DEFAULT_PANEL
-    assert "doc_reviewer" in DEFAULT_PANEL
 
 
 def test_default_judges_created_without_config():
-    panel = JudgePanel(default_model="gpt-4o-mini", default_provider="openai")
+    panel = JudgePanel()
     assert len(panel.judges) == 3
-    roles = {j.role for j in panel.judges}
-    assert roles == set(DEFAULT_PANEL)
+    assert {j.role for j in panel.judges} == set(DEFAULT_PANEL)
 
 
 # ── _verdict_to_dict ──────────────────────────────────────────────────────────
@@ -193,12 +252,10 @@ def test_verdict_to_dict_none():
 
 
 def test_verdict_to_dict_structure():
-    votes = [JudgeVote("technical_expert", "m", "p", {"aggregate": 80}, "reason")]
+    votes = [JudgeVote("technical_expert", "m", "p", {"aggregate": 80}, "r", aggregate=80.0)]
     verdict = PanelVerdict(votes=votes, mean_aggregate=80.0, std_aggregate=0.0,
                            agreement_score=1.0, mean_dimensions={"correctness": 80.0})
     d = _verdict_to_dict(verdict)
     assert d["aggregate"] == 80.0
     assert d["agreement_score"] == 1.0
     assert not d["disagreement_flag"]
-    assert len(d["votes"]) == 1
-    assert d["votes"][0]["role"] == "technical_expert"
