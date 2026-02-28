@@ -26,9 +26,16 @@ def _resp(reviewer, **kwargs):
 
 
 def _patch_llm(responses):
-    it = iter(responses)
-    return patch("doc_benchmarks.questions.panel_reviewer.llm_call",
-                 side_effect=lambda *a, **kw: next(it))
+    """Deterministic mock: returns the matching response based on reviewer role in prompt."""
+    role_map = {r: _resp(r) for r in ["domain_expert", "user_advocate", "qa_engineer"]}
+    # Build ordered list for callers that don't embed role in prompt
+    it_fallback = iter(responses)
+    def _side_effect(prompt, **kw):
+        for role in role_map:
+            if role in prompt:
+                return role_map[role]
+        return next(it_fallback)
+    return patch("doc_benchmarks.questions.panel_reviewer.llm_call", side_effect=_side_effect)
 
 
 # ── _call_reviewer ────────────────────────────────────────────────────────────

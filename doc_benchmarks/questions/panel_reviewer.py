@@ -108,7 +108,8 @@ Output ONLY JSON, no markdown:
 
 DEFAULT_REVIEWERS = ["domain_expert", "user_advocate", "qa_engineer"]
 
-# Weights for final aggregate: domain_expert primary dims × 1.5, others × 1.0
+# Primary dimensions per reviewer (mean of these 3 dims = reviewer's primary_score).
+# Panel score = unweighted mean across all reviewers' primary_score values.
 _REVIEWER_PRIMARY_DIMS = {
     "domain_expert":  ("technical_accuracy", "relevance", "depth"),
     "user_advocate":  ("realism", "clarity", "usefulness"),
@@ -183,8 +184,16 @@ class QuestionPanelReviewer:
             raw = llm_call(prompt, model=self.model, provider=self.provider)
             data = extract_json_object(raw)
             dims = _REVIEWER_PRIMARY_DIMS[reviewer]
-            scores = {k: max(0.0, min(100.0, float(data[k]))) for k in dims if k in data}
-            flags = [str(f) for f in data.get("flags", []) if isinstance(f, str)]
+            # Require all dims; missing dim counts as 0 (penalize incomplete response)
+            scores = {k: max(0.0, min(100.0, float(data[k]))) if k in data else 0.0 for k in dims}
+            # Normalize flags: handle string (LLM bug) or list; lowercase+strip
+            raw_flags = data.get("flags", [])
+            if isinstance(raw_flags, list):
+                flags = [f.lower().strip() for f in raw_flags if isinstance(f, str) and f.strip()]
+            elif isinstance(raw_flags, str) and raw_flags.strip():
+                flags = [raw_flags.lower().strip()]
+            else:
+                flags = []
             primary = round(statistics.mean(scores.values()), 1) if scores else None
             return ReviewerVote(
                 reviewer=reviewer,
@@ -209,7 +218,7 @@ class QuestionPanelReviewer:
             std = round(statistics.stdev(scores), 1) if len(scores) > 1 else 0.0
             agreement = round(max(0.0, 1.0 - std / 50.0), 3)
 
-        all_flags = sorted(set(f for v in votes for f in v.flags))
+        all_flags = sorted(set(f.lower().strip() for v in votes for f in v.flags))
 
         # Recommendation logic
         if panel_score is None:
@@ -254,6 +263,10 @@ class QuestionPanelReviewer:
         n = len(questions)
         results = []
 
+        # Create output dir before first incremental write
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
         for i, q in enumerate(questions, 1):
             print(f"[{i}/{n}] Reviewing: {q[:60]}…", flush=True)
             review = self.review_question(q, library_name)
@@ -263,7 +276,6 @@ class QuestionPanelReviewer:
 
         report = _build_report(library_name, results)
         if output_path:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(json.dumps(_report_to_dict(report), indent=2))
 
         return report

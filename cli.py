@@ -350,7 +350,11 @@ def cmd_questions_panel_review(args: argparse.Namespace) -> None:
     """Panel review of question quality with 3 role-differentiated LLM reviewers."""
     from doc_benchmarks.questions.panel_reviewer import QuestionPanelReviewer, DEFAULT_REVIEWERS
 
-    reviewers = [r.strip() for r in args.reviewers.split(",")] if args.reviewers else DEFAULT_REVIEWERS
+    reviewers = [r.strip() for r in args.reviewers.split(",") if r.strip()] if args.reviewers else DEFAULT_REVIEWERS
+    unknown = [r for r in reviewers if r not in DEFAULT_REVIEWERS]
+    if unknown:
+        print(f"Error: unknown reviewers: {unknown}. Valid: {DEFAULT_REVIEWERS}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         questions_data = json.loads(Path(args.questions).read_text())
@@ -359,11 +363,18 @@ def cmd_questions_panel_review(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     # Extract question strings from various JSON shapes
-    raw = questions_data.get("questions", questions_data) if isinstance(questions_data, dict) else questions_data
+    if isinstance(questions_data, dict):
+        raw = questions_data.get("questions") or questions_data.get("answers") or list(questions_data.values())
+    else:
+        raw = questions_data
     if not isinstance(raw, list):
         print("Error: expected a list of questions", file=sys.stderr)
         sys.exit(1)
-    questions = [q["question"] if isinstance(q, dict) else str(q) for q in raw if q]
+    questions = [
+        (q.get("question") or q.get("text") or "").strip() if isinstance(q, dict) else str(q)
+        for q in raw if q
+    ]
+    questions = [q for q in questions if q]  # drop empty strings
 
     output_path = Path(args.output) if args.output else Path(f"reports/{args.product}_question_panel.json")
     n_eff = min(len(questions), args.limit) if args.limit else len(questions)
@@ -939,7 +950,7 @@ def build_parser() -> argparse.ArgumentParser:
     score_p.add_argument("--answers", required=True, help="Path to answers JSON file")
     score_p.add_argument("--output", default=None, help="Output file (default: eval/{product}.json)")
     score_p.add_argument("--judge-model", default="gpt-4o-mini", help="LLM model for judging")
-    score_p.add_argument("--judge-provider", default="anthropic", choices=["openai", "anthropic"])
+    score_p.add_argument("--judge-provider", default="openai", choices=["openai", "anthropic", "azure", "bedrock", "google"])
     score_p.add_argument("--concurrency", type=positive_int, default=5, help="Parallel judge calls (default: 5)")
     score_p.set_defaults(func=cmd_eval_score)
 
