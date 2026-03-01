@@ -97,7 +97,7 @@ def _render_product_section(p: ProductSnapshot, top_n: int) -> list[str]:
             w = f"{stats['avg_with_docs']:.1f}" if stats["avg_with_docs"] is not None else "—"
             wo = f"{stats['avg_without_docs']:.1f}" if stats["avg_without_docs"] is not None else "—"
             d = _fmt_delta(stats["avg_delta"])
-            grounded = f"{stats['grounded']}/{stats['count']}" if stats.get("grounded") else "—"
+            grounded = f"{stats['grounded']}/{stats['count']}" if stats.get("grounded") is not None else "—"
             lines.append(f"| `{source}` | {stats['count']} | {w} | {wo} | {d} | {grounded} |")
 
     # Worst questions
