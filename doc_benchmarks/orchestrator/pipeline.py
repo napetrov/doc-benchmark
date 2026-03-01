@@ -248,15 +248,30 @@ class EvaluationPipeline:
             max_topics=20
         )
         
-        # Generate questions
+        # Generate questions — hybrid mode if doc_url available
         generator = QuestionGenerator(model=self.model, provider=self.provider)
-        questions = generator.generate_questions(
-            library_name=self.product,
-            personas=personas["personas"],
-            topics=topics,
-            questions_per_topic=self.questions_per_topic
-        )
-        
+        doc_url = self.doc_source if self.doc_source.startswith("url:") else None
+        if doc_url:
+            doc_url = doc_url[4:]  # strip "url:" prefix
+
+        if doc_url:
+            questions = generator.generate_hybrid(
+                library_name=self.product,
+                personas=personas["personas"],
+                topics=topics,
+                doc_url=doc_url,
+                total_questions=self.questions_per_topic * len(topics) * len(personas["personas"]),
+                chunk_ratio=0.4,
+                questions_per_topic=self.questions_per_topic,
+            )
+        else:
+            questions = generator.generate_questions(
+                library_name=self.product,
+                personas=personas["personas"],
+                topics=topics,
+                questions_per_topic=self.questions_per_topic,
+            )
+
         # Add source tracking
         for q in questions:
             q["source_type"] = "generated"
