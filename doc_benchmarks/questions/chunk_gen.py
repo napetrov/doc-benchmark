@@ -18,6 +18,7 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
 from doc_benchmarks.llm import llm_call, extract_json_array
@@ -57,6 +58,9 @@ Generate __COUNT__ questions now:"""
 # ── Chunking ─────────────────────────────────────────────────────────────────
 
 def _fetch_url(url: str, timeout: int = 20) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme '{parsed.scheme}': only http/https allowed")
     req = Request(url, headers={"User-Agent": "doc-benchmark/1.0"})
     with urlopen(req, timeout=timeout) as resp:
         raw = resp.read()

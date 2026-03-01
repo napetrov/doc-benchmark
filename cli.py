@@ -978,7 +978,7 @@ def build_parser() -> argparse.ArgumentParser:
     refine_q_p.add_argument("--target-intermediate", type=int, default=10, dest="target_intermediate")
     refine_q_p.add_argument("--target-advanced", type=int, default=10, dest="target_advanced")
     refine_q_p.add_argument("--sim-threshold", type=float, default=0.82, dest="sim_threshold",
-                             help="Cosine similarity threshold for deduplication (default: 0.82)")
+                             help="Edit-distance similarity threshold for deduplication (default: 0.82, range 0-1)")
     refine_q_p.add_argument("--dry-run", action="store_true", dest="dry_run",
                              help="Print report only, do not write output file")
     refine_q_p.add_argument("--fill-gaps", action="store_true", dest="fill_gaps",

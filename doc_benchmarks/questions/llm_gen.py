@@ -215,8 +215,8 @@ class QuestionGenerator:
         chunk_result = chunk_gen.generate(library_name, doc_url, n_chunk)
         chunk_qs = to_question_dicts(chunk_result)
 
-        # ── Merge + assign IDs ────────────────────────────────────────────────
-        all_questions = persona_qs + chunk_qs
+        # ── Merge, normalize, assign IDs ─────────────────────────────────────
+        all_questions = normalize_questions(persona_qs + chunk_qs)
         for i, q in enumerate(all_questions, 1):
             q["id"] = f"q_{i:03d}"
 
