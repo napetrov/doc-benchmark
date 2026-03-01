@@ -197,22 +197,29 @@ class QuestionGenerator:
 
         # ── Persona-based (60%) ───────────────────────────────────────────────
         persona_qs = self.generate_questions(library_name, personas, topics, questions_per_topic)
-        # Trim to budget
         persona_qs = persona_qs[:n_persona]
         for q in persona_qs:
             q.setdefault("question_source", "persona")
-            # Normalize text→question field
             if "question" not in q and "text" in q:
                 q["question"] = q.pop("text")
 
-        # ── Chunk-based (40%) ─────────────────────────────────────────────────
+        # If persona generation returned fewer than planned, give the gap to chunks
+        actual_persona = len(persona_qs)
+        n_chunk_actual = total_questions - actual_persona
+        if actual_persona < n_persona:
+            logger.info(
+                f"Persona generation returned {actual_persona}/{n_persona}; "
+                f"expanding chunk budget to {n_chunk_actual}"
+            )
+
+        # ── Chunk-based (40% or more if persona was short) ────────────────────
         chunk_gen = ChunkBasedQuestionGenerator(
             model=self.model,
             provider=self.provider,
             questions_per_chunk=2,
             max_chunks=25,
         )
-        chunk_result = chunk_gen.generate(library_name, doc_url, n_chunk)
+        chunk_result = chunk_gen.generate(library_name, doc_url, n_chunk_actual)
         chunk_qs = to_question_dicts(chunk_result)
 
         # ── Merge, normalize, assign IDs ─────────────────────────────────────

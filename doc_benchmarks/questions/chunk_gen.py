@@ -76,6 +76,23 @@ def _strip_html(html: str) -> str:
     return text.strip()
 
 
+def _split_long_para(para: str, max_chars: int) -> List[str]:
+    """Split a single oversized paragraph at word/line boundaries."""
+    parts = []
+    lines = para.split("\n")
+    current = ""
+    for line in lines:
+        if len(current) + len(line) + 1 > max_chars:
+            if current:
+                parts.append(current.strip())
+            current = line
+        else:
+            current = (current + "\n" + line).strip() if current else line
+    if current.strip():
+        parts.append(current.strip())
+    return parts or [para]
+
+
 def _chunk_text(text: str, max_chars: int = 2000, overlap: int = 200) -> List[str]:
     paragraphs = re.split(r"\n{2,}", text)
     chunks: List[str] = []
@@ -84,12 +101,19 @@ def _chunk_text(text: str, max_chars: int = 2000, overlap: int = 200) -> List[st
         para = para.strip()
         if not para or len(para) < 30:
             continue
-        if len(current) + len(para) > max_chars:
-            if current:
-                chunks.append(current.strip())
-            current = current[-overlap:] + "\n\n" + para if current else para
-        else:
-            current = (current + "\n\n" + para).strip() if current else para
+        # Split oversized paragraphs (e.g. long code blocks without blank lines)
+        sub_paras = _split_long_para(para, max_chars) if len(para) > max_chars else [para]
+        for sp in sub_paras:
+            if len(current) + len(sp) > max_chars:
+                if current:
+                    chunks.append(current.strip())
+                # Overlap: find last word boundary
+                tail = current[-overlap:] if current else ""
+                boundary = tail.rfind("\n")
+                tail = tail[boundary + 1:] if boundary >= 0 else tail
+                current = (tail + "\n\n" + sp).strip() if tail else sp
+            else:
+                current = (current + "\n\n" + sp).strip() if current else sp
     if current.strip():
         chunks.append(current.strip())
     return chunks
@@ -160,8 +184,9 @@ class ChunkBasedQuestionGenerator:
             math.ceil(total_questions / self.questions_per_chunk),
             total_chunks,
         )
-        step = max(1, total_chunks // needed)
-        selected = [i * step for i in range(needed)][:needed]
+        # Float step ensures even coverage across the whole document
+        step = total_chunks / needed
+        selected = sorted(set(int(i * step) for i in range(needed)))[:needed]
 
         all_questions: List[ChunkQuestion] = []
         remaining = total_questions

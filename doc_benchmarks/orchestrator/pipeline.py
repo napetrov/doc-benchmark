@@ -255,12 +255,17 @@ class EvaluationPipeline:
             doc_url = doc_url[4:]  # strip "url:" prefix
 
         if doc_url:
+            # Cap at a sane default; questions_per_topic * topics * personas can be huge
+            target_total = min(
+                self.questions_per_topic * len(topics) * len(personas["personas"]),
+                100,  # hard cap — adjust via CLI if needed
+            )
             questions = generator.generate_hybrid(
                 library_name=self.product,
                 personas=personas["personas"],
                 topics=topics,
                 doc_url=doc_url,
-                total_questions=self.questions_per_topic * len(topics) * len(personas["personas"]),
+                total_questions=target_total,
                 chunk_ratio=0.4,
                 questions_per_topic=self.questions_per_topic,
             )

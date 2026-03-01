@@ -44,9 +44,16 @@ def _normalize_difficulty(value: Any) -> str:
     return _DIFFICULTY_MAP.get(s, "intermediate")
 
 
+_CANONICAL_KEYS = {"id", "question", "persona", "category", "difficulty", "expected_topics"}
+
 def normalize_question(q: Dict[str, Any], idx: int = 0) -> Dict[str, Any]:
-    """Normalize a single question record to canonical schema."""
-    return {
+    """Normalize a single question record to canonical schema.
+
+    Extra fields (ground_truth_chunk, chunk_index, source_url, question_source,
+    metadata, etc.) are preserved so chunk-grounded questions don't lose their
+    ground truth reference.
+    """
+    canonical = {
         "id":              q.get("id") or q.get("question_id") or f"q{idx:04d}",
         "question":        q.get("question") or q.get("text") or "",
         "persona":         q.get("persona") or "",
@@ -54,6 +61,11 @@ def normalize_question(q: Dict[str, Any], idx: int = 0) -> Dict[str, Any]:
         "difficulty":      _normalize_difficulty(q.get("difficulty")),
         "expected_topics": q.get("expected_topics") or [],
     }
+    # Preserve all extra fields (chunk metadata, source tracking, etc.)
+    for k, v in q.items():
+        if k not in _CANONICAL_KEYS and k not in ("text", "question_id"):
+            canonical[k] = v
+    return canonical
 
 
 def normalize_questions(questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
