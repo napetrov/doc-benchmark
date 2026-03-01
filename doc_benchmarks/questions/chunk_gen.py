@@ -184,6 +184,8 @@ class ChunkBasedQuestionGenerator:
             math.ceil(total_questions / self.questions_per_chunk),
             total_chunks,
         )
+        if needed == 0:
+            return ChunkQuestionResult(total_chunks=total_chunks, source_url=doc_url)
         # Float step ensures even coverage across the whole document
         step = total_chunks / needed
         selected = sorted(set(int(i * step) for i in range(needed)))[:needed]
