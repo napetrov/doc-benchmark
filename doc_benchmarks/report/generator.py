@@ -70,6 +70,9 @@ class ReportGenerator:
         # Failure analysis
         failure_summary = summarise_diagnoses(evaluations)
 
+        # Source breakdown
+        sources_summary = self._compute_source_summary(evaluations, q_lookup)
+
         # Evaluator-independence warning (non-fatal)
         run_meta = eval_data.get("run_metadata", {}) if isinstance(eval_data, dict) else {}
         answer_model = run_meta.get("answer_model")
@@ -93,6 +96,7 @@ class ReportGenerator:
                 "top_deltas": top_deltas,
                 "bottom_deltas": bottom_deltas,
                 "clusters": clusters,
+                "sources_summary": sources_summary,
                 "failure_analysis": failure_summary,
                 "warnings": {
                     "evaluator_independence": evaluator_independence_warning,
@@ -106,6 +110,7 @@ class ReportGenerator:
             return self._format_markdown(
                 stats, top_with, bottom_with, top_deltas, bottom_deltas,
                 clusters, failure_summary,
+                sources_summary=sources_summary,
                 evaluator_independence_warning=evaluator_independence_warning,
                 answer_model=answer_model,
                 answer_provider=answer_provider,
@@ -243,6 +248,33 @@ class ReportGenerator:
         
         return clusters
     
+    def _compute_source_summary(self, evaluations: List[Dict], q_lookup: Dict[str, Dict]) -> List[Dict[str, Any]]:
+        """Compute performance broken down by question source_type (generated vs manual)."""
+        source_map = defaultdict(list)
+        for e in evaluations:
+            qid = e["question_id"]
+            q = q_lookup.get(qid, {})
+            # Default to unknown if not present
+            stype = q.get("source_type", "unknown")
+            source_map[stype].append(e)
+
+        results = []
+        for stype, evals in source_map.items():
+            with_scores = [e["with_docs"]["aggregate"] for e in evals if e.get("with_docs")]
+            without_scores = [e["without_docs"]["aggregate"] for e in evals if e.get("without_docs")]
+            deltas = [e["delta"] for e in evals if e.get("delta") is not None]
+
+            results.append({
+                "source_type": stype,
+                "count": len(evals),
+                "with_avg": round(sum(with_scores) / len(with_scores), 1) if with_scores else 0,
+                "without_avg": round(sum(without_scores) / len(without_scores), 1) if without_scores else 0,
+                "delta_avg": round(sum(deltas) / len(deltas), 1) if deltas else 0,
+            })
+            
+        results.sort(key=lambda x: x["source_type"])
+        return results
+
     def _format_markdown(
         self,
         stats: Dict,
@@ -252,6 +284,7 @@ class ReportGenerator:
         bottom_deltas: List[Dict],
         clusters: List[Dict],
         failure_summary: Optional[Dict] = None,
+        sources_summary: Optional[List[Dict]] = None,
         evaluator_independence_warning: bool = False,
         answer_model: Optional[str] = None,
         answer_provider: Optional[str] = None,
@@ -364,6 +397,24 @@ class ReportGenerator:
                 f"{cluster['with_avg']:.1f} | {cluster['without_avg']:.1f} | "
                 f"**{cluster['delta_avg']:+.1f}** |"
             )
+            
+        # ── Source Breakdown ─────────────────────────────────────────────
+        if sources_summary:
+            lines.extend([
+                "",
+                "---",
+                "",
+                "## Performance by Question Source",
+                "",
+                "| Source Type | Count | WITH Avg | WITHOUT Avg | Delta |",
+                "|-------------|-------|----------|-------------|-------|",
+            ])
+            for src in sources_summary:
+                lines.append(
+                    f"| {src['source_type']} | {src['count']} | "
+                    f"{src['with_avg']:.1f} | {src['without_avg']:.1f} | "
+                    f"**{src['delta_avg']:+.1f}** |"
+                )
         
         # ── Failure Analysis section ─────────────────────────────────────
         if failure_summary:
