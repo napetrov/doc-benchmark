@@ -145,7 +145,7 @@ class Judge:
         self.model = model
         self.provider = provider
         self.api_key = api_key
-        self.run_metadata = run_metadata or {}
+        self.run_metadata = dict(run_metadata) if run_metadata else {}
 
         if provider == "openai":
             self.llm = ChatOpenAI(model=model, api_key=api_key)
