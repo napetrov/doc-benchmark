@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from doc_benchmarks.utils import normalize_model_ref
 from pathlib import Path
 from typing import Any, Dict
 
@@ -17,10 +18,6 @@ from doc_benchmarks.personas.analyzer import PersonaAnalyzer
 from doc_benchmarks.personas.generator import PersonaGenerator
 
 
-def _normalize_model_ref(provider: str, model: str) -> str:
-    return f"{(provider or '').strip().lower()}/{(model or '').strip().lower()}"
-
-
 def _warn_judge_independence(
     answer_provider: str,
     answer_model: str,
@@ -29,7 +26,7 @@ def _warn_judge_independence(
     context: str = "run",
 ) -> bool:
     """Emit a non-fatal warning when answer and judge use the same model/provider."""
-    same = _normalize_model_ref(answer_provider, answer_model) == _normalize_model_ref(judge_provider, judge_model)
+    same = normalize_model_ref(answer_provider, answer_model) == normalize_model_ref(judge_provider, judge_model)
     if same:
         print(
             "⚠ Evaluator independence warning "
@@ -766,13 +763,13 @@ def cmd_eval_score(args: argparse.Namespace) -> None:
         model=args.judge_model,
         provider=args.judge_provider,
         run_metadata={
-            "question_model": answer_model,
-            "question_provider": answer_provider,
+            "question_model": answers_data.get("question_model", "unknown") if isinstance(answers_data, dict) else "unknown",
+            "question_provider": answers_data.get("question_provider", "unknown") if isinstance(answers_data, dict) else "unknown",
             "answer_model": answer_model,
             "answer_provider": answer_provider,
             "judge_model": args.judge_model,
             "judge_provider": args.judge_provider,
-            "evaluator_independence_warning": _normalize_model_ref(answer_provider, answer_model) == _normalize_model_ref(args.judge_provider, args.judge_model),
+            "evaluator_independence_warning": normalize_model_ref(answer_provider, answer_model) == normalize_model_ref(args.judge_provider, args.judge_model),
         },
     )
     
