@@ -70,6 +70,21 @@ class ReportGenerator:
         # Failure analysis
         failure_summary = summarise_diagnoses(evaluations)
 
+        # Evaluator-independence warning (non-fatal)
+        run_meta = eval_data.get("run_metadata", {}) if isinstance(eval_data, dict) else {}
+        answer_model = run_meta.get("answer_model")
+        answer_provider = run_meta.get("answer_provider")
+        judge_model = run_meta.get("judge_model")
+        judge_provider = run_meta.get("judge_provider")
+        evaluator_independence_warning = bool(
+            run_meta.get("evaluator_independence_warning")
+            or (
+                answer_model and answer_provider and judge_model and judge_provider
+                and str(answer_model).strip().lower() == str(judge_model).strip().lower()
+                and str(answer_provider).strip().lower() == str(judge_provider).strip().lower()
+            )
+        )
+
         if output_format == "json":
             return json.dumps({
                 "stats": stats,
@@ -79,11 +94,23 @@ class ReportGenerator:
                 "bottom_deltas": bottom_deltas,
                 "clusters": clusters,
                 "failure_analysis": failure_summary,
+                "warnings": {
+                    "evaluator_independence": evaluator_independence_warning,
+                    "answer_model": answer_model,
+                    "answer_provider": answer_provider,
+                    "judge_model": judge_model,
+                    "judge_provider": judge_provider,
+                },
             }, indent=2)
         else:
             return self._format_markdown(
                 stats, top_with, bottom_with, top_deltas, bottom_deltas,
-                clusters, failure_summary
+                clusters, failure_summary,
+                evaluator_independence_warning=evaluator_independence_warning,
+                answer_model=answer_model,
+                answer_provider=answer_provider,
+                judge_model=judge_model,
+                judge_provider=judge_provider,
             )
     
     def _compute_stats(self, evaluations: List[Dict]) -> Dict[str, Any]:
@@ -225,6 +252,11 @@ class ReportGenerator:
         bottom_deltas: List[Dict],
         clusters: List[Dict],
         failure_summary: Optional[Dict] = None,
+        evaluator_independence_warning: bool = False,
+        answer_model: Optional[str] = None,
+        answer_provider: Optional[str] = None,
+        judge_model: Optional[str] = None,
+        judge_provider: Optional[str] = None,
     ) -> str:
         """Format report as Markdown."""
         lines = [
@@ -243,13 +275,28 @@ class ReportGenerator:
             f"- **Improvements:** {stats['doc_improvements']} questions (docs helped)",
             f"- **Degradations:** {stats['doc_degradations']} questions (docs hurt)",
             "",
+        ]
+
+        if evaluator_independence_warning:
+            lines.extend([
+                "## ⚠️ Evaluation Integrity Warning",
+                "",
+                "Answering and judging used the same model/provider. This can bias scores (self-referential evaluation risk).",
+                "",
+                f"- **Answer model:** {answer_provider}/{answer_model}",
+                f"- **Judge model:** {judge_provider}/{judge_model}",
+                "- **Status:** run completed, but interpret results with caution.",
+                "",
+            ])
+
+        lines.extend([
             "---",
             "",
             "## Top 10: Best WITH Docs Performance",
             "",
             "| Question ID | Score | Question Text |",
             "|-------------|-------|---------------|",
-        ]
+        ])
         
         for item in top_with:
             lines.append(f"| {item['question_id']} | {item['score']:.1f} | {item['question_text']}... |")
