@@ -185,8 +185,6 @@ class QuestionValidator:
         if len(questions) == 0:
             return [], []
         
-        # Compute embeddings
-
         texts = [self._q_text(q) for q in questions]
         embeddings = self._get_embeddings(texts)
         
@@ -233,7 +231,6 @@ class QuestionValidator:
             if len(similar) > 1:
                 # Duplicate group found
                 duplicate_groups.append([self._q_text(questions[j]) for j in similar])
-                # Keep the most specific (longest text as heuristic)
                 best_idx = max(similar, key=lambda j: len(self._q_text(questions[j])))
                 unique_indices.append(best_idx)
                 persona_merge_map[best_idx] = similar  # Save for merging later
