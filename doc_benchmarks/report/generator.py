@@ -74,7 +74,8 @@ class ReportGenerator:
         sources_summary = self._compute_source_summary(evaluations, q_lookup)
 
         # Evaluator-independence warning (non-fatal)
-        run_meta = eval_data.get("run_metadata", {}) if isinstance(eval_data, dict) else {}
+        temp_meta = eval_data.get("run_metadata") if isinstance(eval_data, dict) else None
+        run_meta = temp_meta if isinstance(temp_meta, dict) else {}
         answer_model = run_meta.get("answer_model")
         answer_provider = run_meta.get("answer_provider")
         judge_model = run_meta.get("judge_model")
