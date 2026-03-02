@@ -311,13 +311,17 @@ class ReportGenerator:
         ]
 
         if evaluator_independence_warning:
+            answer_provider_safe = answer_provider or "unknown"
+            answer_model_safe = answer_model or "unknown"
+            judge_provider_safe = judge_provider or "unknown"
+            judge_model_safe = judge_model or "unknown"
             lines.extend([
                 "## ⚠️ Evaluation Integrity Warning",
                 "",
                 "Answering and judging used the same model/provider. This can bias scores (self-referential evaluation risk).",
                 "",
-                f"- **Answer model:** {answer_provider}/{answer_model}",
-                f"- **Judge model:** {judge_provider}/{judge_model}",
+                f"- **Answer model:** {answer_provider_safe}/{answer_model_safe}",
+                f"- **Judge model:** {judge_provider_safe}/{judge_model_safe}",
                 "- **Status:** run completed, but interpret results with caution.",
                 "",
             ])
