@@ -747,8 +747,9 @@ def cmd_eval_score(args: argparse.Namespace) -> None:
 
     answer_model = answers_data.get("model", "unknown") if isinstance(answers_data, dict) else "unknown"
     answer_provider = answers_data.get("provider", "unknown") if isinstance(answers_data, dict) else "unknown"
+    same_model_warning = False
     if answer_model != "unknown" and answer_provider != "unknown":
-        _warn_judge_independence(
+        same_model_warning = _warn_judge_independence(
             answer_provider=answer_provider,
             answer_model=answer_model,
             judge_provider=args.judge_provider,
@@ -769,7 +770,7 @@ def cmd_eval_score(args: argparse.Namespace) -> None:
             "answer_provider": answer_provider,
             "judge_model": args.judge_model,
             "judge_provider": args.judge_provider,
-            "evaluator_independence_warning": normalize_model_ref(answer_provider, answer_model) == normalize_model_ref(args.judge_provider, args.judge_model),
+            "evaluator_independence_warning": same_model_warning,
         },
     )
     
