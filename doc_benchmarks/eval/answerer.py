@@ -85,8 +85,7 @@ class Answerer:
             self.llm = ChatAnthropic(model=model, api_key=api_key)
         else:
             from doc_benchmarks.utils import get_llm
-            import os
-            self.llm = get_llm(provider, model, api_key or os.environ.get("OPENROUTER_API_KEY"))
+            self.llm = get_llm(provider, model, api_key)
         self.top_k = top_k
         self.debug_retrieval = debug_retrieval
         
@@ -321,10 +320,7 @@ class Answerer:
             docs=docs_text[:15000]  # Limit to avoid token overflow
         )
         
-        try:
-            response = self.llm.invoke(prompt)
-        except TypeError:
-            response = self.llm.invoke(prompt)
+        response = self.llm.invoke(prompt)
         answer_text = response.content if hasattr(response, "content") else str(response)
         
         result = {

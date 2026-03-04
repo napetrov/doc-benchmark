@@ -43,6 +43,7 @@ class EvaluationPipeline:
         doc_source: str = "context7",
         context7_id: Optional[str] = None,
         max_tokens_per_question: int = 4000,
+        force_regen: bool = False,
     ):
         """
         Initialize pipeline.
@@ -97,6 +98,7 @@ class EvaluationPipeline:
         self.doc_source = doc_source
         self.context7_id = context7_id
         self.max_tokens_per_question = max_tokens_per_question
+        self.force_regen = force_regen
 
         # Output paths
         self.personas_path = self.output_dir / "personas" / f"{product}.json"
@@ -126,7 +128,7 @@ class EvaluationPipeline:
         
         # Step 1: Discover personas (cached if already exists)
         logger.info("Step 1/6: Discovering personas...")
-        if self.personas_path.exists():
+        if (not self.force_regen) and self.personas_path.exists():
             personas = json.loads(self.personas_path.read_text())
             print(f"✓ Loaded {len(personas.get('personas', []))} personas (cached)")
         else:
@@ -138,7 +140,7 @@ class EvaluationPipeline:
         }
 
         # Step 2+3: Generate & merge questions (cached if already exists)
-        if self.questions_path.exists():
+        if (not self.force_regen) and self.questions_path.exists():
             logger.info("Step 2-3/6: Loading cached questions (skipping generation)...")
             cached = json.loads(self.questions_path.read_text())
             merged_questions = cached.get("questions", cached) if isinstance(cached, dict) else cached

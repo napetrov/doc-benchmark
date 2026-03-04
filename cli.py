@@ -1160,6 +1160,8 @@ def build_parser() -> argparse.ArgumentParser:
     bench_run_p.add_argument("--registry", default=None, help="Path to custom libraries.yaml")
     bench_run_p.add_argument("--max-tokens", type=int, default=4000, dest="max_tokens",
                              help="Max tokens to retrieve per question from doc source (default: 4000)")
+    bench_run_p.add_argument("--force-regen", action="store_true", dest="force_regen",
+                             help="Regenerate personas/questions even if cached files exist")
     bench_run_p.set_defaults(func=cmd_benchmark_run)
 
     # benchmark batch — multiple libraries
@@ -1175,6 +1177,10 @@ def build_parser() -> argparse.ArgumentParser:
     bench_batch_p.add_argument("--judge-model", default="gpt-4o-mini", dest="judge_model")
     bench_batch_p.add_argument("--judge-provider", default="openai", dest="judge_provider",
                                choices=["openai", "anthropic", "amazon-bedrock", "google-vertex", "openrouter", "openai-codex"])
+    bench_batch_p.add_argument("--max-tokens", type=int, default=4000, dest="max_tokens",
+                               help="Max tokens to retrieve per question from doc source (default: 4000)")
+    bench_batch_p.add_argument("--force-regen", action="store_true", dest="force_regen",
+                               help="Regenerate personas/questions even if cached files exist")
     bench_batch_p.add_argument("--registry", default=None, help="Path to custom libraries.yaml")
     bench_batch_p.add_argument("--fail-fast", action="store_true", dest="fail_fast",
                                help="Stop on first failure (default: continue all)")
@@ -1275,7 +1281,7 @@ def cmd_library_show(args: argparse.Namespace) -> None:
     print(f"Description  :\n  {entry.description}")
 
 
-def _run_single_library(entry, output_dir: str, model: str, provider: str, judge_model: str, judge_provider: str = "openai", doc_source_override=None, max_tokens_per_question: int = 4000) -> dict:
+def _run_single_library(entry, output_dir: str, model: str, provider: str, judge_model: str, judge_provider: str = "openai", doc_source_override=None, max_tokens_per_question: int = 4000, force_regen: bool = False) -> dict:
     """Run full evaluation pipeline for one LibraryEntry. Returns result dict."""
     from doc_benchmarks.orchestrator import EvaluationPipeline
     from pathlib import Path as _Path
@@ -1309,6 +1315,7 @@ def _run_single_library(entry, output_dir: str, model: str, provider: str, judge
         context7_id=entry.context7_id,
         doc_source=doc_source,
         max_tokens_per_question=max_tokens_per_question,
+        force_regen=force_regen,
     )
     result = pipeline.run()
     return {"library": entry.key, "name": entry.name, "status": "ok", "result": result}
@@ -1333,6 +1340,7 @@ def cmd_benchmark_run(args: argparse.Namespace) -> None:
         judge_provider=getattr(args, "judge_provider", "openai"),
         doc_source_override=getattr(args, "doc_source", None),
         max_tokens_per_question=getattr(args, "max_tokens", 4000),
+        force_regen=getattr(args, "force_regen", False),
     )
     print(f"\n✅ Done: {entry.name}")
 
@@ -1369,6 +1377,8 @@ def cmd_benchmark_batch(args: argparse.Namespace) -> None:
                 provider=args.provider,
                 judge_model=args.judge_model,
                 judge_provider=getattr(args, "judge_provider", "openai"),
+                max_tokens_per_question=getattr(args, "max_tokens", 4000),
+                force_regen=getattr(args, "force_regen", False),
             )
             results.append(r)
         except Exception as exc:
