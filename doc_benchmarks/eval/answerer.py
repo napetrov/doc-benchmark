@@ -84,7 +84,9 @@ class Answerer:
         elif provider == "anthropic":
             self.llm = ChatAnthropic(model=model, api_key=api_key)
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            from doc_benchmarks.utils import get_llm
+            import os
+            self.llm = get_llm(provider, model, api_key or os.environ.get("OPENROUTER_API_KEY"))
         self.top_k = top_k
         self.debug_retrieval = debug_retrieval
         
@@ -319,7 +321,10 @@ class Answerer:
             docs=docs_text[:15000]  # Limit to avoid token overflow
         )
         
-        response = self.llm.invoke(prompt)
+        try:
+            response = self.llm.invoke(prompt)
+        except TypeError:
+            response = self.llm.invoke(prompt)
         answer_text = response.content if hasattr(response, "content") else str(response)
         
         result = {
