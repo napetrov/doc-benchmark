@@ -1,11 +1,11 @@
-# Doc-Benchmark Pipeline: Описание и схема
+# Doc-Benchmark Pipeline: Overview and Architecture
 
-**Репозиторий:** https://github.com/napetrov/doc-benchmark  
-**Дата:** 2026-03-04
+**Repository:** https://github.com/napetrov/doc-benchmark  
+**Date:** 2026-03-04
 
 ---
 
-## Схема пайплайна
+## Pipeline Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -17,27 +17,27 @@
        │
        ▼
 ┌─────────────────┐
-│   1. PERSONAS   │  LLM анализирует репо и создаёт профили пользователей
-│                 │  кто пишет код, кто оптимизирует, кто интегрирует
+│   1. PERSONAS   │  LLM analyzes the repo and creates user profiles:
+│                 │  who writes code, who optimizes, who integrates
 │ Output:         │
-│ personas/       │  Пример персоны:
-│ oneTBB.json     │  • HPC Engineer — advanced, заботится о NUMA/throughput
+│ personas/       │  Example personas:
+│ oneTBB.json     │  • HPC Engineer — advanced, cares about NUMA/throughput
 └────────┬────────┘  • ML Framework Dev — intermediate, flow graph & latency
          │           • Systems Integrator — beginner, CMake/build config
          │
          ▼
 ┌─────────────────┐
-│  2. QUESTIONS   │  Для каждой персоны × seed topics → вопросы
+│  2. QUESTIONS   │  For each persona × seed topics → questions
 │                 │
-│  Внутри:        │  a) Context7 → извлекает seed topics из документации
-│  • LLM генерит  │  б) LLM генерит вопросы (по сложности: basic/advanced)
-│  • Валидация    │  в) LLM-валидатор отсеивает слабые (threshold 60)
-│  • Дедупликация │  г) Embedding similarity → дедупликация (>0.85)
-│                 │  д) Merge personas для дублей
+│  Internally:    │  a) Context7 → extracts seed topics from library docs
+│  • LLM generates│  b) LLM generates questions (by difficulty: basic/advanced)
+│  • Validation   │  c) LLM validator filters weak questions (threshold 60)
+│  • Deduplication│  d) Embedding similarity → dedup (cosine > 0.85)
+│                 │  e) Merge personas for near-duplicate questions
 │ Output:         │
-│ questions/      │  Типы вопросов: how-to, scenario, explain, compare
+│ questions/      │  Question types: how-to, scenario, explain, compare
 │ oneTBB.json     │  Difficulty: basic / intermediate / advanced
-└────────┬────────┘  Всего: 30-80 уникальных вопросов
+└────────┬────────┘  Total: 30–80 unique questions
          │
          ├────────────────────────────────────┐
          ▼                                    ▼
@@ -45,48 +45,47 @@
 │  3a. ANSWERS    │                │  3b. ANSWERS    │
 │  WITH DOCS      │                │  WITHOUT DOCS   │
 │                 │                │                 │
-│ Context7 →      │                │ LLM отвечает    │
-│ достаёт         │                │ только из       │
-│ релевантные     │                │ встроенных      │
-│ фрагменты docs  │                │ знаний          │
-│ → LLM с         │                │ (baseline)      │
-│ контекстом      │                │                 │
+│ Context7 →      │                │ LLM answers     │
+│ retrieves       │                │ from built-in   │
+│ relevant doc    │                │ knowledge only  │
+│ snippets →      │                │ (baseline)      │
+│ LLM answers     │                │                 │
+│ with context    │                │                 │
 └────────┬────────┘                └────────┬────────┘
          │                                  │
          └──────────────┬───────────────────┘
                         │
                         ▼
               ┌─────────────────┐
-              │ answers/        │
-              │ oneTBB.json     │  Каждая запись:
-              └────────┬────────┘  { with_docs: {answer, retrieved_docs},
-                       │             without_docs: {answer} }
+              │ answers/        │  Each entry:
+              │ oneTBB.json     │  { with_docs: {answer, retrieved_docs},
+              └────────┬────────┘    without_docs: {answer} }
                        │
                        ▼
 ┌─────────────────────────────────────────────────────┐
 │                 4. EVALUATION                        │
-│              (LLM-as-Judge)                         │
+│              (LLM-as-Judge)                          │
 │                                                     │
-│  Судья: отдельная модель (claude-sonnet-4-6)        │
-│  Отвечает НЕ та же модель что генерировала ответы   │
+│  Judge: separate model (claude-sonnet-4-6)          │
+│  NOT the same model that generated the answers      │
 │                                                     │
-│  Оценивает каждый ответ по 5 измерениям (0-100):    │
+│  Scores each answer on 5 dimensions (0–100):        │
 │                                                     │
 │  ┌─────────────────┬────────────────────────────┐   │
-│  │ Dimension       │ Что проверяет               │   │
+│  │ Dimension       │ What it measures            │   │
 │  ├─────────────────┼────────────────────────────┤   │
-│  │ Correctness     │ Фактическая точность        │   │
-│  │ Completeness    │ Полнота охвата темы         │   │
-│  │ Specificity     │ Привязка к конкретной lib   │   │
-│  │ Code Quality    │ Корректность кода / примеров│   │
-│  │ Actionability   │ Можно ли применить сразу   │   │
+│  │ Correctness     │ Factual accuracy            │   │
+│  │ Completeness    │ Coverage of the topic       │   │
+│  │ Specificity     │ Relevance to the library    │   │
+│  │ Code Quality    │ Correctness of code samples │   │
+│  │ Actionability   │ Can be applied immediately  │   │
 │  └─────────────────┴────────────────────────────┘   │
 │                                                     │
 │  Aggregate = avg(5 dims)                            │
-│  Delta = with_docs.aggregate - without_docs.agg     │
+│  Delta = with_docs.aggregate − without_docs.agg     │
 │                                                     │
 │  Diagnosis:                                         │
-│  • docs_helped (delta > 0)                          │
+│  • docs_helped          (delta > 0)                 │
 │  • knowledge_sufficient (delta ≤ 0)                 │
 └─────────────────────────────────────────────────────┘
                        │
@@ -100,10 +99,10 @@
 ┌─────────────────────────────────────────────────────┐
 │                 5. REPORT                            │
 │                                                     │
-│  • Агрегированные метрики                           │
-│  • Топ/боттом вопросы                               │
-│  • Анализ delta (где docs помогли/помешали)         │
-│  • Рекомендации по улучшению документации           │
+│  • Aggregated metrics                               │
+│  • Top / bottom questions by score                  │
+│  • Delta analysis (where docs helped / hurt)        │
+│  • Prioritized documentation fix recommendations    │
 └─────────────────────────────────────────────────────┘
                        │
                        ▼
@@ -113,71 +112,71 @@
 
 ---
 
-## Модели в пайплайне
+## Models Used
 
-| Шаг | Роль | Модель (текущий прогон) |
-|-----|------|------------------------|
-| Personas | Генератор | gpt-4o |
-| Questions | Генератор + валидатор | gpt-4o |
-| Answers with_docs | Отвечает с контекстом | gpt-4o |
+| Step | Role | Model (current run) |
+|------|------|---------------------|
+| Personas | Generator | gpt-4o |
+| Questions | Generator + validator | gpt-4o |
+| Answers with_docs | Answers with context | gpt-4o |
 | Answers without_docs | Baseline answerer | gpt-4o |
-| Evaluation | Судья (Judge) | claude-sonnet-4-6 |
+| Evaluation | Judge | claude-sonnet-4-6 |
 | Embeddings (dedup) | Similarity | text-embedding-3-small |
 
-> **Ключевой принцип:** Judge ≠ Answerer. Разные модели на генерацию и оценку — избегаем self-serving bias.
+> **Key principle:** Judge ≠ Answerer. Different models for generation and evaluation — avoids self-serving bias.
 
 ---
 
-## Context7 — роль в пайплайне
+## Context7 — Role in the Pipeline
 
-Context7 — сервис, который умеет:
-1. **Topic discovery** — извлекает ключевые темы из документации библиотеки (по repo slug)
-2. **Retrieval (RAG)** — для каждого вопроса возвращает релевантные фрагменты docs
+Context7 is a documentation retrieval service that provides:
+1. **Topic discovery** — extracts key topics from library documentation (by repo slug)
+2. **Retrieval (RAG)** — for each question, returns relevant documentation snippets
 
 ```
-Вопрос → Context7.resolve_library("oneTBB")
-       → Context7.search(question_text, max_tokens=8000)
-       → retrieved_docs (список сниппетов)
-       → LLM(question + retrieved_docs) → answer_with_docs
+Question → Context7.resolve_library("oneTBB")
+         → Context7.search(question_text, max_tokens=8000)
+         → retrieved_docs (list of snippets)
+         → LLM(question + retrieved_docs) → answer_with_docs
 ```
 
 ---
 
-## Структура файлов
+## File Structure
 
 ```
 results/onetbb_final/
 ├── personas/
-│   └── oneTBB.json          # 5-8 персон с профилями
+│   └── oneTBB.json          # 5–8 user personas with profiles
 ├── questions/
-│   └── oneTBB.json          # 80 вопросов с метаданными
+│   └── oneTBB.json          # 80 questions with metadata
 ├── answers/
-│   └── oneTBB.json          # Ответы with_docs + without_docs
+│   └── oneTBB.json          # Answers: with_docs + without_docs
 ├── eval/
-│   └── oneTBB.json          # Оценки по 5 dim + delta + diagnosis
+│   └── oneTBB.json          # Scores per 5 dims + delta + diagnosis
 └── reports/
-    ├── oneTBB.md                        # Основной отчёт
-    └── oneTBB_low_scores_analysis.md    # Анализ слабых мест (этот файл)
+    ├── oneTBB.md                          # Main report
+    └── oneTBB_low_scores_analysis.md      # Low score analysis & fix priorities
 ```
 
 ---
 
-## Запуск пайплайна (CLI)
+## CLI Usage
 
 ```bash
-# 1. Персоны
+# 1. Generate personas
 python cli.py personas discover --product oneTBB --repo uxlfoundation/oneTBB --count 5
 
-# 2. Вопросы
+# 2. Generate questions
 python cli.py questions generate --product oneTBB --personas personas/oneTBB.json --count 2
 
-# 3. Ответы
+# 3. Generate answers (with and without docs)
 python cli.py answers generate --product oneTBB --questions questions/oneTBB.json --model gpt-4o
 
-# 4. Эвалюация
+# 4. Run evaluation
 python cli.py eval score --product oneTBB --answers answers/oneTBB.json \
   --judge-model claude-sonnet-4 --judge-provider anthropic
 
-# 5. Отчёт
+# 5. Generate report
 python cli.py report generate --product oneTBB --eval eval/oneTBB.json
 ```

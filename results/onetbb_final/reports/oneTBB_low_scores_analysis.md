@@ -1,107 +1,107 @@
-# oneTBB Doc Quality — Анализ слабых мест
+# oneTBB Doc Quality — Low Score Analysis
 
-**Дата:** 2026-03-04  
-**Датасет:** `results/onetbb_final` (80 вопросов)  
-**Судья:** claude-sonnet-4-6
-
----
-
-## Общая статистика
-
-| Режим | Min | Avg | Max |
-|-------|-----|-----|-----|
-| Без документации (`without_docs`) | 42 | 84.4 | 100 |
-| С документацией (`with_docs`) | 24 | 84.3 | 100 |
-
-- **docs_helped:** 50 вопросов (62.5%) — документация улучшила ответ
-- **knowledge_sufficient:** 30 вопросов (37.5%) — модель знала без документации
+**Date:** 2026-03-04  
+**Dataset:** `results/onetbb_final` (80 questions)  
+**Judge model:** claude-sonnet-4-6
 
 ---
 
-## 1. Вопросы с наименьшим рейтингом БЕЗ документации
+## Summary Statistics
 
-_Это области, где LLM плохо отвечает из встроенных знаний — документация может значительно помочь._
+| Mode | Min | Avg | Max |
+|------|-----|-----|-----|
+| Without docs (`without_docs`) | 42 | 84.4 | 100 |
+| With docs (`with_docs`) | 24 | 84.3 | 100 |
 
-| # | Score (no→with) | Delta | Question ID | Тема |
-|---|----------------|-------|-------------|------|
-| 1 | 42 → 54 | +12 | q_026 | Preprocessor макросы / CMake для отключения dynamic memory allocation и кастомного аллокатора |
-| 2 | 51 → 67 | +16 | onetbb-Q005 | Reader-writer mutex: разница spin_rw_mutex и speculative_spin_rw_mutex при read-mostly доступе |
-| 3 | 55 → **94** | **+39** | q_008 | Производительность `tbb::feeder` vs `parallel_for` с lazy evaluation |
-| 4 | 56 → 63 | +7 | q_018 | CMake-конфигурация arena observers + `tbb::feeder` для отладки scheduling |
-| 5 | 61 → **92** | **+31** | onetbb-Q001 | Гонки данных при инкременте member counter в `parallel_for` body |
-| 6 | 64 → **93** | **+29** | q_016 | Task stealing: `tbb::task` vs кастомный work queue с explicit task affinity |
-| 7 | 67 → 76 | +9 | onetbb-Q013 | Безопасность итерации по `concurrent_vector` во время параллельной записи |
-| 8 | 73 → 87 | +14 | q_036 | `std::move` с concurrent контейнерами — moved-from объекты |
-| 9 | 73 → 88 | +15 | onetbb-Q021 | NUMA/hybrid CPU: locality через task_arena + `constraints` |
-| 10 | 76 → 87 | +11 | q_013 | `task_group` vs `task_arena` — разница в контроле thread participation |
-
-### Ключевые слабости (без документации):
-
-| Проблема | Вопросы |
-|----------|---------|
-| **Неправильный код** (`code_quality` < 50) | q_026, q_008, onetbb-Q001, q_016 |
-| **Неверное correctness** (< 50) | q_026, onetbb-Q005, q_008, q_018, onetbb-Q013 |
-| **Не даёт actionable steps** (actionability < 30) | onetbb-Q005 |
-
-### Что нужно улучшить/добавить в документацию:
-
-1. **CMake custom allocator** — раздел про `TBBmalloc_proxy` и `TBBMALLOC_SCALABLE_PROXY` недостаточно детален
-2. **spin_rw_mutex vs speculative_spin_rw_mutex** — нет примеров с write-heavy vs read-heavy сравнением производительности
-3. **tbb::feeder performance** — нет benchmark-сравнения с `parallel_for`
-4. **Arena observers** — отсутствует пример CMake + observer API вместе
-5. **Data races в parallel_for body** — нужен explicit anti-pattern раздел с примерами race-free счётчиков
-6. **NUMA task_arena constraints** — примеры есть, но разбросаны; нужен единый how-to guide
+- **docs_helped:** 50 questions (62.5%) — documentation improved the answer
+- **knowledge_sufficient:** 30 questions (37.5%) — model answered well without docs
 
 ---
 
-## 2. Вопросы с наименьшим рейтингом С документацией
+## 1. Lowest-Rated Questions — WITHOUT Documentation
 
-_Это области, где документация активно мешает или вводит в заблуждение — критично для исправления._
+_Areas where LLM answers poorly from built-in knowledge alone. Documentation can make a significant difference here._
 
-| # | Score (no→with) | Delta | Question ID | Тема |
-|---|----------------|-------|-------------|------|
-| 1 | **94 → 24** | **-70** | q_044 | Инвалидация итераторов/ссылок при расширении `concurrent_vector` |
-| 2 | **77 → 38** | **-39** | q_019 | CMake: установка только компонентов flow graph без полного task scheduler |
-| 3 | **81 → 55** | **-26** | q_020 | Thread pinning для flow graph nodes (inference latency) |
-| 4 | **84 → 57** | **-27** | q_032 | `tbb::flow` dynamic allocation для нод — compile-time alternatives |
-| 5 | **86 → 63** | **-23** | q_035 | CMake linking + `std::move` с `concurrent_vector` без data races |
-| 6 | **86 → 63** | **-23** | q_052 | Blocking внутри `parallel_for` на `std::cout` — thread utilization |
-| 7 | **87 → 67** | **-20** | q_049 | `parallel_do_feeder` non-blocking push — cache coherence impl |
-| 8 | **100 → 73** | **-27** | onetbb-Q011 | Exception handling внутри parallel алгоритмов |
+| # | Score (no→with) | Δ | Question ID | Topic |
+|---|----------------|---|-------------|-------|
+| 1 | 42 → 54 | +12 | q_026 | Preprocessor macros / CMake options to disable dynamic memory allocation and use a custom allocator |
+| 2 | 51 → 67 | +16 | onetbb-Q005 | Reader-writer mutex: `spin_rw_mutex` vs `speculative_spin_rw_mutex` in read-mostly workloads |
+| 3 | 55 → **94** | **+39** | q_008 | Performance of `tbb::feeder` vs `parallel_for` with lazy evaluation |
+| 4 | 56 → 63 | +7 | q_018 | CMake configuration: arena observers + `tbb::feeder` for scheduling debug |
+| 5 | 61 → **92** | **+31** | onetbb-Q001 | Data race when incrementing a member counter inside `parallel_for` body |
+| 6 | 64 → **93** | **+29** | q_016 | Task stealing: `tbb::task` vs custom work queue with explicit task affinity |
+| 7 | 67 → 76 | +9 | onetbb-Q013 | Iterator safety on `concurrent_vector` during concurrent appends |
+| 8 | 73 → 87 | +14 | q_036 | `std::move` with concurrent containers — moved-from object state |
+| 9 | 73 → 88 | +15 | onetbb-Q021 | NUMA/hybrid CPU: locality via `task_arena` + `constraints` |
+| 10 | 76 → 87 | +11 | q_013 | `task_group` vs `task_arena` — thread participation control |
 
-### Конкретные ошибки в документации (требуют fix):
+### Key weaknesses (without docs):
 
-#### 🔴 Критические (документация вводит в заблуждение):
+| Issue | Questions |
+|-------|-----------|
+| **Incorrect / broken code** (`code_quality` < 50) | q_026, q_008, onetbb-Q001, q_016 |
+| **Factually wrong** (`correctness` < 50) | q_026, onetbb-Q005, q_008, q_018, onetbb-Q013 |
+| **Not actionable** (`actionability` < 30) | onetbb-Q005 |
 
-**q_044 — `concurrent_vector` iterator invalidation (-70)**
-> Документация содержит **неверное утверждение**: ссылки на элементы `concurrent_vector` якобы могут стать невалидными при расширении. На самом деле `concurrent_vector` гарантирует стабильность ссылок. Документ должен быть исправлен.
+### Documentation improvements needed:
 
-**q_019 — CMake компонентная установка (-39)**
-> Документация описывает флаги которых нет или они не работают. Пользователь следует инструкциям и не находит нужного компонента. Нужен актуальный пример `find_package(TBB COMPONENTS tbb)`.
-
-**q_032 — flow graph node allocation (-27)**
-> Код в документации имеет **семантическую ошибку**: создаёт узлы в стеке, хотя `graph` берёт ownership и ожидает heap allocation. Пример компилируется но приводит к UB.
-
-#### 🟡 Значительные (документация неполная/вводящая):
-
-**q_020 — Thread pinning (-26)**
-> Документация предлагает ручной OS-level pinning (`pthread_setaffinity`), но не упоминает `task_arena::constraints` — наиболее правильный TBB-native способ.
-
-**onetbb-Q005 — Reader-writer mutex (-16 для with_docs)**
-> Документация содержит **ошибку по умолчанию**: `scoped_lock(mutex, bool write=?)` — указан неверный default. Нужно проверить и исправить.
+1. **CMake custom allocator** — the `TBBmalloc_proxy` / `TBBMALLOC_SCALABLE_PROXY` section lacks working end-to-end examples
+2. **`spin_rw_mutex` vs `speculative_spin_rw_mutex`** — missing read-heavy vs write-heavy performance comparison with code
+3. **`tbb::feeder` performance** — no benchmark comparison with `parallel_for`
+4. **Arena observers** — no combined CMake + observer API example
+5. **Data race anti-patterns in `parallel_for`** — needs an explicit anti-pattern section with race-free counter patterns
+6. **NUMA `task_arena::constraints`** — examples exist but are scattered; consolidate into a single how-to guide
 
 ---
 
-## 3. Сводная таблица приоритетов по исправлениям
+## 2. Lowest-Rated Questions — WITH Documentation
 
-| Приоритет | Тема | Тип исправления |
-|-----------|------|----------------|
-| 🔴 P0 | `concurrent_vector` iterator validity | Исправить ошибочное утверждение |
-| 🔴 P0 | `tbb::flow` node allocation pattern | Исправить код с UB |
-| 🔴 P0 | `scoped_lock` default write flag | Исправить неверный default |
-| 🔴 P1 | CMake component install (flow graph) | Обновить примеры |
-| 🟡 P1 | `task_arena::constraints` для thread pinning | Добавить как primary approach |
-| 🟡 P2 | CMake custom allocator / `TBBmalloc_proxy` | Расширить раздел |
-| 🟡 P2 | NUMA + constraints how-to guide | Консолидировать scattered примеры |
-| 🟢 P3 | Data races anti-patterns в parallel_for | Добавить anti-pattern раздел |
-| 🟢 P3 | `tbb::feeder` vs `parallel_for` performance | Добавить benchmark comparison |
+_Areas where documentation actively misleads or is insufficient — critical to fix._
+
+| # | Score (no→with) | Δ | Question ID | Topic |
+|---|----------------|---|-------------|-------|
+| 1 | **94 → 24** | **-70** | q_044 | Iterator/reference invalidation in `concurrent_vector` on segment expansion |
+| 2 | **77 → 38** | **-39** | q_019 | CMake: install only flow graph components without full task scheduler |
+| 3 | **81 → 55** | **-26** | q_020 | Thread pinning for flow graph nodes (inference latency) |
+| 4 | **84 → 57** | **-27** | q_032 | `tbb::flow` dynamic allocation for nodes — compile-time alternatives |
+| 5 | **86 → 63** | **-23** | q_035 | CMake linking + `std::move` with `concurrent_vector` without data races |
+| 6 | **86 → 63** | **-23** | q_052 | Blocking inside `parallel_for` on `std::cout` — thread utilization impact |
+| 7 | **87 → 67** | **-20** | q_049 | `parallel_do_feeder` non-blocking push — cache coherence implications |
+| 8 | **100 → 73** | **-27** | onetbb-Q011 | Exception handling inside parallel algorithms |
+
+### Specific documentation errors (require fixes):
+
+#### 🔴 Critical — documentation actively misleads:
+
+**q_044 — `concurrent_vector` iterator invalidation (Δ -70)**
+> Documentation contains an **incorrect claim**: element references in `concurrent_vector` may become invalid on expansion. In fact, `concurrent_vector` **guarantees reference stability**. This must be corrected — the current text will cause users to add unnecessary defensive code.
+
+**q_019 — CMake component install (Δ -39)**
+> Documentation describes flags that either don't exist or don't work as described. Users follow the instructions and cannot find the expected component. Needs an up-to-date example using `find_package(TBB COMPONENTS tbb)`.
+
+**q_032 — flow graph node allocation (Δ -27)**
+> Code sample has a **semantic error**: nodes are created on the stack, but `graph` takes ownership and expects heap allocation. The code compiles but causes undefined behavior at runtime.
+
+#### 🟡 Significant — documentation is incomplete or misleading:
+
+**q_020 — Thread pinning (Δ -26)**
+> Documentation recommends low-level OS pinning (`pthread_setaffinity`) without mentioning `task_arena::constraints` — the correct TBB-native approach.
+
+**onetbb-Q005 — Reader-writer mutex default (Δ -16 with docs)**
+> Documentation contains an **error in the default value**: `scoped_lock(mutex, bool write=?)` — incorrect default is documented. Needs verification and correction.
+
+---
+
+## 3. Prioritized Fix List
+
+| Priority | Topic | Action |
+|----------|-------|--------|
+| 🔴 P0 | `concurrent_vector` reference/iterator stability | Fix incorrect claim — references do NOT invalidate |
+| 🔴 P0 | `tbb::flow` node stack allocation pattern | Fix code example (UB on heap ownership) |
+| 🔴 P0 | `scoped_lock` default write flag | Verify and correct documented default |
+| 🔴 P1 | CMake component install for flow graph | Update with working `find_package` example |
+| 🟡 P1 | `task_arena::constraints` for thread pinning | Add as primary recommended approach |
+| 🟡 P2 | CMake custom allocator / `TBBmalloc_proxy` | Expand with end-to-end example |
+| 🟡 P2 | NUMA + constraints how-to guide | Consolidate scattered examples into one page |
+| 🟢 P3 | Data race anti-patterns in `parallel_for` | Add anti-pattern section with race-free examples |
+| 🟢 P3 | `tbb::feeder` vs `parallel_for` performance | Add benchmark comparison |
