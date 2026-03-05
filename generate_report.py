@@ -111,7 +111,7 @@ def generate_report(eval_path: str, out_path: str):
 
     lines = []
 
-    # Header
+    # Header + context
     lines += [
         f"# {library} Documentation Quality Report",
         f"_Generated: {datetime.now(tz=_TZ).strftime('%Y-%m-%d %H:%M %Z') if _TZ else datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
@@ -122,6 +122,32 @@ def generate_report(eval_path: str, out_path: str):
         f'| Answer model | {meta.get("answer_model", "—")} ({meta.get("answer_provider", "—")}) |',
         f'| Judge model | {data.get("judge_model", "—")} ({data.get("judge_provider", "—")}) |',
         f'| Total questions | {all_stats["count"]} ({dyn_stats["count"]} dynamic + {static_stats["count"]} golden static) |',
+        "",
+    ]
+
+    # Legend
+    lines += [
+        "## How to Read This Report",
+        "",
+        "Each answer is scored **0–100** by the judge model across 5 dimensions: "
+        "correctness, completeness, specificity, code quality, actionability. "
+        "**Aggregate** is their weighted average.",
+        "",
+        "**Delta = WITH docs − WITHOUT docs score**",
+        "Positive = docs helped. Zero/negative = model already knew the answer, or retrieved chunks were off-topic.",
+        "",
+        "| Question type | Description |",
+        "|---|---|",
+        "| 🔵 static (golden) | Hand-curated questions with known expected answers — highest signal |",
+        "| 🟡 dynamic (generated) | Auto-generated from library docs and user personas |",
+        "",
+        "| Diagnosis | Meaning |",
+        "|---|---|",
+        "| ✅ Docs helped | Delta > 0 — retrieval improved the answer |",
+        "| 🔵 Model knowledge sufficient | Delta ≤ 0 — model answered without needing docs |",
+        "| 🔴 Empty retrieval | No chunks retrieved |",
+        "| 🟡 Low relevance | Retrieved chunks were off-topic |",
+        "| ⚪ Insufficient data | Score or answer missing |",
         "",
     ]
 
