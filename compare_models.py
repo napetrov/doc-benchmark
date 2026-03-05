@@ -105,9 +105,13 @@ def generate_comparison(runs: dict, out_path: str):
     ]
     for lbl, v in loaded.items():
         m = v["meta"]
+        jp = v["data"].get("judge_provider", "?")
+        # normalize naming for consistency in reports
+        if jp in ("google", "gemini"):
+            jp = "google-vertex"
         lines.append(
             f'| **{lbl}** | {m.get("answer_model","?")} ({m.get("answer_provider","?")}) '
-            f'| {v["data"].get("judge_model","?")} ({v["data"].get("judge_provider","?")}) |'
+            f'| {v["data"].get("judge_model","?")} ({jp}) |'
         )
     lines += ["", f"Common questions evaluated: **{len(common_valid)}**", ""]
 
@@ -187,42 +191,6 @@ def generate_comparison(runs: dict, out_path: str):
     lines.append(f"| tie | {c} | {round(c/total_common*100)}% |")
     lines.append("")
 
-    # --- Top 15: GPT-4o much better ---
-    lines += [
-        f"## Top 15 — {labels[1]} >> {labels[0]} (biggest positive gaps)",
-        "| QID | Type | Diff | " + " | ".join(f"{lbl}" for lbl in labels) + " | Gap | Question |",
-        "|---|---|---|" + "|---:" * len(labels) + "|---:|---|",
-    ]
-    gaps = []
-    for qid in common_valid:
-        scores = [loaded[lbl]["evals"][qid]["with_docs"]["aggregate"] for lbl in labels]
-        gap = scores[1] - scores[0]
-        gaps.append((qid, gap, scores))
-
-    for qid, gap, scores in sorted(gaps, key=lambda x: -x[1])[:15]:
-        e = loaded[labels[0]]["evals"][qid]
-        qtype = "🔵" if is_static(qid) else "🟡"
-        diff = e.get("difficulty", "—")
-        q = e["question_text"][:60] + "..."
-        row = f"| {qid} | {qtype} | {diff} | " + " | ".join(f"{s:.1f}" for s in scores) + f" | **{gap:+.1f}** | {q} |"
-        lines.append(row)
-    lines.append("")
-
-    # --- Top 15: DeepSeek much better ---
-    lines += [
-        f"## Top 15 — {labels[0]} >> {labels[1]} (biggest negative gaps)",
-        "| QID | Type | Diff | " + " | ".join(f"{lbl}" for lbl in labels) + " | Gap | Question |",
-        "|---|---|---|" + "|---:" * len(labels) + "|---:|---|",
-    ]
-    for qid, gap, scores in sorted(gaps, key=lambda x: x[1])[:15]:
-        e = loaded[labels[0]]["evals"][qid]
-        qtype = "🔵" if is_static(qid) else "🟡"
-        diff = e.get("difficulty", "—")
-        q = e["question_text"][:60] + "..."
-        row = f"| {qid} | {qtype} | {diff} | " + " | ".join(f"{s:.1f}" for s in scores) + f" | **{gap:+.1f}** | {q} |"
-        lines.append(row)
-    lines.append("")
-
     # --- Delta comparison (which model benefits more from docs) ---
     lines += [
         "## Doc Retrieval Benefit — Delta Comparison",
@@ -231,49 +199,96 @@ def generate_comparison(runs: dict, out_path: str):
         "| Run | Avg Delta | Questions docs helped | Questions docs hurt |",
         "|---|---:|---:|---:|",
     ]
-    for lbl, v in loaded.items():
-        s = compute_stats(v["evals"])
+    summaries = {lbl: compute_stats(v["evals"]) for lbl, v in loaded.items()}
+    for lbl in sorted(labels, key=lambda l: summaries[l]["delta_avg"], reverse=True):
+        s = summaries[lbl]
         lines.append(f'| **{lbl}** | **{s["delta_avg"]:+}** | {s["improvements"]} ({round(s["improvements"]/s["n"]*100)}%) | {s["degradations"]} ({round(s["degradations"]/s["n"]*100)}%) |')
     lines.append("")
 
-    # --- Key findings ---
-    # Compute who has better overall WITH score
-    summaries = {lbl: compute_stats(v["evals"]) for lbl, v in loaded.items()}
+    # --- Model ranking ---
+    lines += [
+        "## Model Ranking",
+        "",
+        "### By absolute quality (WITH docs)",
+        "| Rank | Run | WITH docs avg |",
+        "|---:|---|---:|",
+    ]
+    for i, lbl in enumerate(sorted(labels, key=lambda l: summaries[l]["with_avg"], reverse=True), start=1):
+        lines.append(f"| {i} | **{lbl}** | {summaries[lbl]['with_avg']} |")
+
+    lines += [
+        "",
+        "### By retrieval utilisation (Delta)",
+        "| Rank | Run | Delta |",
+        "|---:|---|---:|",
+    ]
+    for i, lbl in enumerate(sorted(labels, key=lambda l: summaries[l]["delta_avg"], reverse=True), start=1):
+        lines.append(f"| {i} | **{lbl}** | {summaries[lbl]['delta_avg']:+} |")
+    lines.append("")
+
+    # --- Baseline weak spots per model (absolute WITHOUT score) ---
+    lines += [
+        "## Baseline Weak Spots by Model (WITHOUT docs absolute score)",
+        "_Lowest absolute baseline scores per model (not delta)._",
+        "",
+    ]
+    for lbl in labels:
+        model_rows = []
+        for qid in common_valid:
+            e = loaded[lbl]["evals"][qid]
+            model_rows.append((qid, e["without_docs"]["aggregate"], e))
+        lines += [
+            f"### {lbl}",
+            "| QID | WITHOUT score | WITH score | Delta | Difficulty | Question |",
+            "|---|---:|---:|---:|---|---|",
+        ]
+        for qid, without_abs, e in sorted(model_rows, key=lambda x: x[1])[:10]:
+            q = str(e.get("question_text", "")).replace("|", "\\|").replace("\n", " ")
+            lines.append(
+                f"| {qid} | **{without_abs}** | {e['with_docs']['aggregate']} | {e['delta']:+.1f} | {e.get('difficulty','—')} | {q} |"
+            )
+        lines.append("")
+
+    # --- Questions with highest disagreement across models ---
+    lines += [
+        "## Questions with Highest Model Disagreement (WITH docs)",
+        "_These questions separate model capabilities most strongly._",
+        "",
+        "| QID | Diff | Min score | Max score | Spread | Question |",
+        "|---|---|---:|---:|---:|---|",
+    ]
+    spread_rows = []
+    for qid in common_valid:
+        scores = [loaded[lbl]["evals"][qid]["with_docs"]["aggregate"] for lbl in labels]
+        spread_rows.append((qid, min(scores), max(scores), max(scores) - min(scores), loaded[labels[0]]["evals"][qid]))
+
+    for qid, min_s, max_s, spread, e in sorted(spread_rows, key=lambda x: -x[3])[:15]:
+        q = str(e.get("question_text", "")).replace("|", "\\|").replace("\n", " ")
+        lines.append(f"| {qid} | {e.get('difficulty','—')} | {min_s:.1f} | {max_s:.1f} | **{spread:.1f}** | {q} |")
+    lines.append("")
+
+    # --- Overall analysis ---
     best_with = max(labels, key=lambda l: summaries[l]["with_avg"])
     best_delta = max(labels, key=lambda l: summaries[l]["delta_avg"])
+    worst_delta = min(labels, key=lambda l: summaries[l]["delta_avg"])
 
     lines += [
-        "## Key Findings",
+        "## Overall Analysis & Assessment",
         "",
-        f"- **Higher absolute score (WITH docs):** {best_with} "
-        f"({summaries[best_with]['with_avg']} vs "
-        f"{', '.join(str(summaries[l]['with_avg']) for l in labels if l != best_with)})",
-        f"- **Better retrieval utilisation (delta):** {best_delta} "
-        f"(delta {summaries[best_delta]['delta_avg']:+})",
-        f"- **Head-to-head:** {labels[0]} wins on {win_counts[labels[0]]} questions, "
-        f"{labels[1]} wins on {win_counts[labels[1]]} questions, "
-        f"{win_counts['tie']} ties (out of {total_common})",
+        f"- **Best absolute quality (WITH docs):** {best_with} ({summaries[best_with]['with_avg']})",
+        f"- **Best documentation utilisation (delta):** {best_delta} ({summaries[best_delta]['delta_avg']:+})",
+        f"- **Weakest retrieval utilisation:** {worst_delta} ({summaries[worst_delta]['delta_avg']:+})",
+        "- **Interpretation:** Use WITH docs score to rank raw model answer quality; use Delta to evaluate documentation/retrieval contribution.",
         "",
-        "### Pattern analysis",
+        "### Per-model assessment",
         "",
     ]
-
-    # Detect pattern: which question types each model does well on
-    ds_strong = [(qid, gap) for qid, gap, _ in sorted(gaps, key=lambda x: x[1])[:10]]
-    gpt_strong = [(qid, gap) for qid, gap, _ in sorted(gaps, key=lambda x: -x[1])[:10]]
-
-    ds_intermediate_wins = sum(1 for qid, _ in ds_strong if loaded[labels[0]]["evals"][qid].get("difficulty") == "intermediate")
-    gpt_advanced_wins = sum(1 for qid, _ in gpt_strong if loaded[labels[0]]["evals"][qid].get("difficulty") in ("advanced", "medium", "hard"))
-
-    lines += [
-        f"- **{labels[0]}** is stronger on fact-extraction / enumeration questions "
-        f"(\"what is listed in the excerpt?\") — follows retrieval context more literally.",
-        f"- **{labels[1]}** is stronger on reasoning / troubleshooting questions "
-        f"(\"how do I configure / resolve?\") — better at combining general knowledge with docs.",
-        "- The gap is largest on intermediate questions where docs add new specific facts "
-        "that the model doesn't know from training alone.",
-        "",
-    ]
+    for lbl in sorted(labels, key=lambda l: summaries[l]["with_avg"], reverse=True):
+        s = summaries[lbl]
+        stance = "strong absolute model" if s["with_avg"] >= 84 else "mid absolute model"
+        retrieval = "docs help" if s["delta_avg"] > 1 else ("docs neutral" if s["delta_avg"] >= -1 else "docs hurt")
+        lines.append(f"- **{lbl}:** WITH={s['with_avg']}, WITHOUT={s['without_avg']}, Δ={s['delta_avg']:+} → {stance}; {retrieval}.")
+    lines.append("")
 
     report = "\n".join(lines)
     dir_path = os.path.dirname(out_path)

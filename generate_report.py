@@ -60,6 +60,13 @@ def fmt_delta(d):
     return f"+{d}" if d > 0 else str(d)
 
 
+def fmt_question(text: str) -> str:
+    """Keep full question text, but make it markdown-table safe."""
+    if text is None:
+        return ""
+    return str(text).replace("\n", " ").replace("|", "\\|").strip()
+
+
 def detect_static_prefix(evals):
     """Detect the prefix used for static/golden questions (e.g. 'onedal-Q', 'onetbb-Q')."""
     for e in evals:
@@ -84,7 +91,7 @@ DIAG_MAP = {
 DIFFICULTY_ORDER = ["easy", "beginner", "intermediate", "medium", "advanced", "hard"]
 
 
-def generate_report(eval_path: str, out_path: str):
+def generate_report(eval_path: str, out_path: str, qa_json_out: str | None = None):
     with open(eval_path) as f:
         data = json.load(f)
 
@@ -223,7 +230,7 @@ def generate_report(eval_path: str, out_path: str):
     ]
     for e in sorted(valid_all, key=lambda x: x["delta"], reverse=True)[:15]:
         src = "🔵 static" if static_prefix and e["question_id"].startswith(static_prefix) else "🟡 gen"
-        q = e["question_text"][:70] + "..."
+        q = fmt_question(e.get("question_text", ""))
         delta = round(e["delta"], 1) if isinstance(e["delta"], float) else e["delta"]
         lines.append(
             f'| {e["question_id"]} | {src} | **{fmt_delta(delta)}** '
@@ -240,12 +247,33 @@ def generate_report(eval_path: str, out_path: str):
     ]
     for e in sorted(valid_all, key=lambda x: x["delta"])[:15]:
         src = "🔵 static" if static_prefix and e["question_id"].startswith(static_prefix) else "🟡 gen"
-        q = e["question_text"][:70] + "..."
+        q = fmt_question(e.get("question_text", ""))
         delta = round(e["delta"], 1) if isinstance(e["delta"], float) else e["delta"]
         lines.append(
             f'| {e["question_id"]} | {src} | **{fmt_delta(delta)}** '
             f'| {e["with_docs"]["aggregate"]} | {e["without_docs"]["aggregate"]} '
             f'| {e.get("difficulty", "—")} | {q} |'
+        )
+    lines.append("")
+
+    # Worst baseline (WITHOUT docs) by absolute score
+    baseline_sorted = [
+        e for e in evals
+        if e.get("without_docs") and e["without_docs"].get("aggregate") is not None
+    ]
+    lines += [
+        "## Baseline Weak Spots (WITHOUT docs absolute score)",
+        "_Lowest absolute scores for the base model without retrieval context._",
+        "",
+        "| QID | Source | WITHOUT score | WITH score | Difficulty | Question |",
+        "|---|---|---:|---:|---|---|",
+    ]
+    for e in sorted(baseline_sorted, key=lambda x: x["without_docs"]["aggregate"])[:15]:
+        src = "🔵 static" if static_prefix and e["question_id"].startswith(static_prefix) else "🟡 gen"
+        without_abs = e["without_docs"]["aggregate"]
+        with_abs = e["with_docs"]["aggregate"] if e.get("with_docs") and e["with_docs"].get("aggregate") is not None else "N/A"
+        lines.append(
+            f'| {e["question_id"]} | {src} | **{without_abs}** | {with_abs} | {e.get("difficulty", "—")} | {fmt_question(e.get("question_text", ""))} |'
         )
     lines.append("")
 
@@ -262,7 +290,7 @@ def generate_report(eval_path: str, out_path: str):
         d = round(delta, 1) if isinstance(delta, float) else delta
         lines.append(
             f'| {e["question_id"]} | {e.get("difficulty", "—")} | {wd} | {wod} '
-            f'| {fmt_delta(d)} | {e["question_text"][:70]}... |'
+            f'| {fmt_delta(d)} | {fmt_question(e.get("question_text", ""))} |'
         )
     lines.append("")
 
@@ -279,7 +307,7 @@ def generate_report(eval_path: str, out_path: str):
         d = round(delta, 1) if isinstance(delta, float) else delta
         lines.append(
             f'| {e["question_id"]} | {e.get("difficulty", "—")} | {wd} | {wod} '
-            f'| {fmt_delta(d)} | {e["question_text"][:70]}... |'
+            f'| {fmt_delta(d)} | {fmt_question(e.get("question_text", ""))} |'
         )
     lines.append("")
 
@@ -308,7 +336,47 @@ def generate_report(eval_path: str, out_path: str):
     with open(out_path, "w") as f:
         f.write(report)
 
+    # Sidecar JSON: questions + answers + scores
+    if qa_json_out is None:
+        qa_json_out = out_path.replace(".md", ".qa.json")
+
+    answers_by_id = {}
+    try:
+        answers_path = eval_path.replace("/eval/", "/answers/")
+        with open(answers_path) as af:
+            answers_data = json.load(af)
+        for a in answers_data.get("answers", []):
+            answers_by_id[a.get("question_id")] = a
+    except Exception:
+        answers_by_id = {}
+
+    qa_records = []
+    for e in evals:
+        a = answers_by_id.get(e.get("question_id"), {})
+        qa_records.append({
+            "question_id": e.get("question_id"),
+            "question_text": e.get("question_text"),
+            "difficulty": e.get("difficulty"),
+            "source": "static" if static_prefix and str(e.get("question_id", "")).startswith(static_prefix) else "dynamic",
+            "with_docs_score": (e.get("with_docs") or {}).get("aggregate"),
+            "without_docs_score": (e.get("without_docs") or {}).get("aggregate"),
+            "delta": e.get("delta"),
+            "with_docs_answer": ((a.get("with_docs") or {}).get("answer") if isinstance(a.get("with_docs"), dict) else None),
+            "without_docs_answer": ((a.get("without_docs") or {}).get("answer") if isinstance(a.get("without_docs"), dict) else None),
+        })
+
+    with open(qa_json_out, "w") as jf:
+        json.dump({
+            "eval_path": eval_path,
+            "report_path": out_path,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "run_metadata": meta,
+            "count": len(qa_records),
+            "records": qa_records,
+        }, jf, indent=2, ensure_ascii=False)
+
     print(f"✅ Report written to: {out_path}")
+    print(f"✅ Q&A JSON written to: {qa_json_out}")
     print(f"   Questions: {all_stats['count']} ({dyn_stats['count']} dynamic + {static_stats['count']} static)")
     print(f"   Delta: {all_stats['delta_avg']:+} (with={all_stats['with_avg']}, without={all_stats['without_avg']})")
     return out_path
@@ -318,8 +386,9 @@ def main():
     parser = argparse.ArgumentParser(description="Generate documentation quality report from eval JSON.")
     parser.add_argument("--eval", required=True, help="Path to eval JSON file")
     parser.add_argument("--out", required=True, help="Output path for the markdown report")
+    parser.add_argument("--qa-json-out", default=None, help="Optional path for Q&A JSON export")
     args = parser.parse_args()
-    generate_report(args.eval, args.out)
+    generate_report(args.eval, args.out, args.qa_json_out)
 
 
 if __name__ == "__main__":
