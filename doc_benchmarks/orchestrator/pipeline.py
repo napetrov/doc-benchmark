@@ -128,7 +128,7 @@ class EvaluationPipeline:
         for path in [self.personas_path, self.questions_path, self.answers_path, self.eval_path, self.report_path]:
             path.parent.mkdir(parents=True, exist_ok=True)
     
-    def run(self) -> Dict[str, Any]:
+    def run(self, concurrency: int = 5) -> Dict[str, Any]:
         """
         Run full pipeline.
         
@@ -189,7 +189,7 @@ class EvaluationPipeline:
         
         # Step 4: Generate answers
         logger.info("Step 4/6: Generating answers (WITH + WITHOUT docs)...")
-        answers = self._generate_answers(merged_questions)
+        answers = self._generate_answers(merged_questions, concurrency=concurrency)
         results["steps"]["answers"] = {
             "count": len(answers),
             "path": str(self.answers_path)
@@ -198,7 +198,7 @@ class EvaluationPipeline:
         
         # Step 5: Evaluate answers
         logger.info("Step 5/6: Evaluating answers...")
-        evaluations = self._evaluate_answers(answers)
+        evaluations = self._evaluate_answers(answers, concurrency=concurrency)
         results["steps"]["evaluation"] = {
             "count": len(evaluations),
             "path": str(self.eval_path)
@@ -377,7 +377,7 @@ class EvaluationPipeline:
         
         return unique_questions
     
-    def _generate_answers(self, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _generate_answers(self, questions: List[Dict[str, Any]], concurrency: int = 5) -> List[Dict[str, Any]]:
         """Generate answers WITH and WITHOUT docs."""
         from doc_benchmarks.eval import Answerer
 
@@ -399,7 +399,8 @@ class EvaluationPipeline:
             library_name=self.product,
             library_id=library_id,
             questions=questions,
-            max_tokens_per_question=self.max_tokens_per_question
+            max_tokens_per_question=self.max_tokens_per_question,
+            concurrency=concurrency,
         )
         
         # Save answers
@@ -407,7 +408,7 @@ class EvaluationPipeline:
         
         return answers
     
-    def _evaluate_answers(self, answers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _evaluate_answers(self, answers: List[Dict[str, Any]], concurrency: int = 5) -> List[Dict[str, Any]]:
         """Evaluate answers using LLM-as-judge."""
         from doc_benchmarks.eval import Judge
         
@@ -433,7 +434,7 @@ class EvaluationPipeline:
             },
         )
         
-        evaluations = judge.evaluate_answers(self.product, answers_list)
+        evaluations = judge.evaluate_answers(self.product, answers_list, concurrency=concurrency)
         
         # Save evaluations
         judge.save_evaluations(evaluations, self.eval_path)

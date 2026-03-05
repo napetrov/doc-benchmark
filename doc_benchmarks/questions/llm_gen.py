@@ -93,7 +93,9 @@ class QuestionGenerator:
         elif provider == "anthropic":
             self.llm = ChatAnthropic(model=model, api_key=api_key)
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            from doc_benchmarks.utils import get_llm
+            import os
+            self.llm = get_llm(provider, model, api_key or os.environ.get("OPENROUTER_API_KEY"))
         
         logger.info(f"QuestionGenerator initialized: {provider}/{model}")
     
