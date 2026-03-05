@@ -12,9 +12,16 @@ Usage:
 
 import argparse
 import json
+import math
 import os
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+
+try:
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo("America/Los_Angeles")
+except ImportError:
+    _TZ = None
 
 
 def avg(lst):
@@ -97,14 +104,17 @@ def generate_report(eval_path: str, out_path: str):
     for e in evals:
         diff_groups[e.get("difficulty", "unknown")].append(e)
 
-    valid_all = [e for e in evals if has_scores(e)]
+    valid_all = [
+        e for e in evals
+        if has_scores(e) and isinstance(e.get("delta"), (int, float)) and not math.isnan(e["delta"])
+    ]
 
     lines = []
 
     # Header
     lines += [
         f"# {library} Documentation Quality Report",
-        f"_Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} PST_",
+        f"_Generated: {datetime.now(tz=_TZ).strftime('%Y-%m-%d %H:%M %Z') if _TZ else datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
         "## Run Configuration",
         "| | |",
@@ -159,7 +169,11 @@ def generate_report(eval_path: str, out_path: str):
     lines.append("")
 
     # Diagnosis
-    diag = Counter(e["diagnosis"]["label"] for e in evals if "diagnosis" in e)
+    diag = Counter(
+        e["diagnosis"]["label"]
+        for e in evals
+        if isinstance(e.get("diagnosis"), dict) and "label" in e["diagnosis"]
+    )
     total_diag = sum(diag.values())
     lines += [
         "## Diagnosis",
@@ -253,16 +267,18 @@ def generate_report(eval_path: str, out_path: str):
         f'- **Dynamic vs Static agreement:** {dyn_stats["delta_avg"]:+} vs {static_stats["delta_avg"]:+} — '
         + ("good consistency, benchmark is stable." if abs(dyn_stats["delta_avg"] - static_stats["delta_avg"]) < 3
            else "notable gap — investigate question quality."),
-        f'- **Win rate:** {round(all_stats["improvements"]/all_stats["count"]*100)}% questions improved with docs '
+        f'- **Win rate:** {round(all_stats["improvements"]/all_stats["count"]*100) if all_stats["count"] else 0}% questions improved with docs '
         f'({all_stats["improvements"]}/{all_stats["count"]}).',
-        f'- **Degradations:** {all_stats["degradations"]} questions ({round(all_stats["degradations"]/all_stats["count"]*100)}%) '
-        f'— all diagnosed as model knowledge sufficient.',
+        f'- **Degradations:** {all_stats["degradations"]} questions '
+        f'({round(all_stats["degradations"]/all_stats["count"]*100) if all_stats["count"] else 0}%).',
         "",
     ]
 
     report = "\n".join(lines)
 
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    dir_path = os.path.dirname(out_path)
+    if dir_path:
+        os.makedirs(dir_path, exist_ok=True)
     with open(out_path, "w") as f:
         f.write(report)
 

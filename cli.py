@@ -867,7 +867,8 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         judge_provider=args.judge_provider,
         personas_count=args.personas_count,
         questions_per_topic=args.questions_per_topic,
-        top_k=args.top_k,
+        # Only pass top_k when explicitly set; otherwise let pipeline use config default
+        **({"top_k": args.top_k} if args.top_k is not None else {}),
         rerank_threshold=args.rerank_threshold,
         debug_retrieval=args.debug_retrieval,
         doc_source=getattr(args, "doc_source", "context7"),
@@ -1181,7 +1182,7 @@ def build_parser() -> argparse.ArgumentParser:
     bench_run_p.add_argument("--registry", default=None, help="Path to custom libraries.yaml")
     bench_run_p.add_argument("--max-tokens", type=int, default=4000, dest="max_tokens",
                              help="Max tokens to retrieve per question from doc source (default: 4000)")
-    bench_run_p.add_argument("--concurrency", type=int, default=5, dest="concurrency",
+    bench_run_p.add_argument("--concurrency", type=positive_int, default=5, dest="concurrency",
                              help="Parallel API calls for answering and judging (default: 5)")
     bench_run_p.add_argument("--force-regen", action="store_true", dest="force_regen",
                              help="Regenerate personas/questions even if cached files exist")

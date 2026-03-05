@@ -412,9 +412,15 @@ class EvaluationPipeline:
         """Evaluate answers using LLM-as-judge."""
         from doc_benchmarks.eval import Judge
         
-        # Load answers data
-        answers_data = json.loads(self.answers_path.read_text())
-        answers_list = answers_data.get("answers", answers_data)
+        # Use in-memory answers from the previous step (avoid stale disk read)
+        if isinstance(answers, dict):
+            answers_list = answers.get("answers", answers)
+        elif answers:
+            answers_list = answers
+        else:
+            # Fallback: read from disk if not provided
+            answers_data = json.loads(self.answers_path.read_text())
+            answers_list = answers_data.get("answers", answers_data)
         
         # Evaluate
         judge = Judge(
