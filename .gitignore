@@ -12,3 +12,4 @@ jobs.json
 cr.md
 docs-quality-report/
 baselines/eval/*.json
+*.tar.gz
