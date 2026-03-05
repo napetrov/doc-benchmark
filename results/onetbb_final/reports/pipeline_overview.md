@@ -7,7 +7,7 @@
 
 ## Pipeline Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        DOC-BENCHMARK PIPELINE                           │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -119,7 +119,6 @@
                        │
                        ▼
               reports/oneTBB.md
-              reports/oneTBB_low_scores_analysis.md
 ```
 
 ---
@@ -145,7 +144,7 @@ Context7 is a documentation retrieval service that provides:
 1. **Topic discovery** — extracts key topics from library documentation (by repo slug)
 2. **Retrieval (RAG)** — for each question, returns relevant documentation snippets
 
-```
+```text
 Question → Context7.resolve_library("oneTBB")
          → Context7.search(question_text, max_tokens=8000)
          → retrieved_docs (list of snippets)
@@ -156,7 +155,7 @@ Question → Context7.resolve_library("oneTBB")
 
 ## File Structure
 
-```
+```text
 results/onetbb_final/
 ├── personas/
 │   └── oneTBB.json          # 5–8 user personas with profiles
@@ -167,8 +166,7 @@ results/onetbb_final/
 ├── eval/
 │   └── oneTBB.json          # Scores per 5 dims + delta + diagnosis
 └── reports/
-    ├── oneTBB.md                          # Main report
-    └── oneTBB_low_scores_analysis.md      # Low score analysis & fix priorities
+    └── oneTBB.md                          # Main report (includes low score analysis)
 ```
 
 ---
@@ -257,7 +255,7 @@ python cli.py answers generate --product oneTBB --questions questions/oneTBB.jso
 
 # 4. Run evaluation
 python cli.py eval score --product oneTBB --answers answers/oneTBB.json \
-  --judge-model claude-sonnet-4 --judge-provider anthropic
+  --judge-model claude-sonnet-4-6 --judge-provider anthropic
 
 # 5. Generate report
 python cli.py report generate --product oneTBB --eval eval/oneTBB.json

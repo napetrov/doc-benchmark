@@ -4,7 +4,7 @@ _Generated: 2026-03-04 12:44 PST_
 | | |
 |---|---|
 | Answer model | gpt-4o (openai) |
-| Judge model | gemini-2.5-pro (google-vertex) |
+| Judge model | claude-sonnet-4-6 (anthropic) |
 | Retrieval | Semantic (all-MiniLM-L6-v2), k=3 |
 | Doc source | context7 MCP |
 | Total questions | 80 (56 dynamic + 24 golden static) |
@@ -205,7 +205,7 @@ Code sample has a semantic error: nodes are created on the stack, but `graph` ta
 🟡 **q_020 — Thread pinning (Δ -26)**
 Documentation recommends low-level OS pinning (`pthread_setaffinity`) without mentioning `task_arena::constraints` — the correct TBB-native approach.
 
-🟡 **onetbb-Q005 — Reader-writer mutex default (Δ -16 with docs)**
+🟡 **onetbb-Q005 — Reader-writer mutex default (Δ +16, but correctness=20 with docs)**
 Documentation contains an error in the `scoped_lock` default write flag. Needs verification and correction.
 
 ---

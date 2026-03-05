@@ -90,7 +90,12 @@ class EvaluationPipeline:
         _project_root = Path(__file__).resolve().parent.parent.parent
         _auto_golden = _project_root / "questions" / f"{product.lower()}_golden.json"
         if custom_questions_path:
-            self.custom_questions_path = Path(custom_questions_path)
+            _custom_path = Path(custom_questions_path)
+            if not _custom_path.exists():
+                raise FileNotFoundError(
+                    f"--custom-questions path does not exist: {_custom_path}"
+                )
+            self.custom_questions_path = _custom_path
         elif _auto_golden.exists():
             self.custom_questions_path = _auto_golden
             logger.info(f"Auto-including golden questions: {_auto_golden}")
