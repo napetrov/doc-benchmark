@@ -1051,6 +1051,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen_q_p.add_argument("--personas", required=True, help="Path to personas JSON file")
     gen_q_p.add_argument("--output", default=None, help="Output file (default: questions/{product}.json)")
     gen_q_p.add_argument("--topics", default=None, help="Optional: path to topics JSON (auto-extracted if not provided)")
+    gen_q_p.add_argument("--top-k", type=int, default=None, dest="top_k", help="Docs to retrieve per topic (default from config)")
     gen_q_p.add_argument("--count", type=int, default=2, help="Questions per topic per persona")
     gen_q_p.add_argument("--validate", action="store_true", help="Enable validation and deduplication")
     gen_q_p.add_argument("--model", default="gpt-4o-mini", help="LLM model for generation")
