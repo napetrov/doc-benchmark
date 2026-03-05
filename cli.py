@@ -788,6 +788,14 @@ def cmd_eval_score(args: argparse.Namespace) -> None:
     print(f"\n✅ Saved evaluations to {output_path}")
 
 
+def cmd_report_eval(args: argparse.Namespace) -> None:
+    """Generate quality report from eval JSON (dynamic vs static breakdown)."""
+    from generate_report import generate_report
+
+    out = args.out or f"results/{args.product}/reports/{args.product}_full.md"
+    generate_report(eval_path=args.eval, out_path=out)
+
+
 def cmd_report_generate(args: argparse.Namespace) -> None:
     """Generate comprehensive analysis report from eval results."""
     from doc_benchmarks.report import ReportGenerator
@@ -977,6 +985,13 @@ def build_parser() -> argparse.ArgumentParser:
     report_p = sub.add_parser("report", help="Generate analysis reports")
     report_sub = report_p.add_subparsers(dest="report_cmd", required=True)
     
+    # report eval — lightweight, no questions needed
+    eval_r_p = report_sub.add_parser("eval", help="Generate quality report from eval JSON (dynamic vs static breakdown)")
+    eval_r_p.add_argument("--product", required=True, help="Product name (e.g., oneDAL)")
+    eval_r_p.add_argument("--eval", required=True, help="Path to eval JSON file")
+    eval_r_p.add_argument("--out", default=None, help="Output .md file (default: results/{product}/reports/{product}_full.md)")
+    eval_r_p.set_defaults(func=cmd_report_eval)
+
     # report generate
     gen_r_p = report_sub.add_parser("generate", help="Generate comprehensive report from eval results")
     gen_r_p.add_argument("--product", required=True, help="Product name (e.g., oneTBB)")
