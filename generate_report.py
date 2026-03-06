@@ -195,7 +195,7 @@ def generate_report(eval_path: str, out_path: str):
         "| QID | Source | Delta | WITH | WITHOUT | Difficulty | Question |",
         "|---|---|---:|---:|---:|---|---|",
     ]
-    for e in sorted(valid_all, key=lambda x: x["delta"], reverse=True)[:15]:
+    for e in sorted(valid_all, key=lambda x: x["delta"] if isinstance(x["delta"], (int, float)) else 0, reverse=True)[:15]:
         src = "🔵 static" if static_prefix and e["question_id"].startswith(static_prefix) else "🟡 gen"
         q = e["question_text"][:70] + "..."
         delta = round(e["delta"], 1) if isinstance(e["delta"], float) else e["delta"]
@@ -212,7 +212,7 @@ def generate_report(eval_path: str, out_path: str):
         "| QID | Source | Delta | WITH | WITHOUT | Difficulty | Question |",
         "|---|---|---:|---:|---:|---|---|",
     ]
-    for e in sorted(valid_all, key=lambda x: x["delta"])[:15]:
+    for e in sorted(valid_all, key=lambda x: x["delta"] if isinstance(x["delta"], (int, float)) else 0)[:15]:
         src = "🔵 static" if static_prefix and e["question_id"].startswith(static_prefix) else "🟡 gen"
         q = e["question_text"][:70] + "..."
         delta = round(e["delta"], 1) if isinstance(e["delta"], float) else e["delta"]
