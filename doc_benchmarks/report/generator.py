@@ -7,6 +7,7 @@ from pathlib import Path
 from collections import defaultdict
 import re
 
+from doc_benchmarks.gate.trust_gate import evaluate_trust, format_trust_block
 from doc_benchmarks.eval.diagnoser import (
     summarise_diagnoses,
     DIAGNOSIS_LABELS,
@@ -34,18 +35,19 @@ class ReportGenerator:
         self,
         eval_data: Dict[str, Any],
         questions_data: Dict[str, Any],
-        output_format: str = "markdown"
+        output_format: str = "markdown",
+        multirun_with_averages: Optional[List[float]] = None,
+        trust_thresholds: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Generate comprehensive report.
-        
+
         Args:
             eval_data: Loaded eval JSON (from Judge)
             questions_data: Loaded questions JSON (for clustering)
             output_format: "markdown" or "json"
-        
-        Returns:
-            Report text (markdown) or JSON string
+            multirun_with_averages: Per-run WITH-docs means from N-run mode
+            trust_thresholds: Override default trust gate thresholds
         """
         evaluations = eval_data.get("evaluations", [])
         questions = questions_data.get("questions", [])
@@ -69,6 +71,13 @@ class ReportGenerator:
 
         # Failure analysis
         failure_summary = summarise_diagnoses(evaluations)
+
+        # Trust verdict ("Can we trust this run?")
+        trust_verdict = evaluate_trust(
+            evaluations,
+            thresholds=trust_thresholds,
+            multirun_with_averages=multirun_with_averages,
+        )
 
         # Source breakdown
         sources_summary = self._compute_source_summary(evaluations, q_lookup)
@@ -100,6 +109,15 @@ class ReportGenerator:
                 "clusters": clusters,
                 "sources_summary": sources_summary,
                 "failure_analysis": failure_summary,
+                "trust": {
+                    "verdict": trust_verdict.status,
+                    "trusted": trust_verdict.trusted,
+                    "checks": [
+                        {"name": c.name, "passed": c.passed, "value": c.value,
+                         "threshold": c.threshold, "message": c.message, "severity": c.severity}
+                        for c in trust_verdict.checks
+                    ],
+                },
                 "warnings": {
                     "evaluator_independence": evaluator_independence_warning,
                     "answer_model": answer_model,
@@ -120,6 +138,7 @@ class ReportGenerator:
                 judge_model=judge_model,
                 judge_provider=judge_provider,
                 question_set_hash=question_set_hash,
+                trust_verdict=trust_verdict,
             )
     
     def _compute_stats(self, evaluations: List[Dict]) -> Dict[str, Any]:
@@ -295,6 +314,7 @@ class ReportGenerator:
         judge_model: Optional[str] = None,
         judge_provider: Optional[str] = None,
         question_set_hash: Optional[str] = None,
+        trust_verdict=None,
     ) -> str:
         """Format report as Markdown."""
         lines = [
@@ -303,6 +323,13 @@ class ReportGenerator:
             f"**Total Questions:** {stats['total_questions']}",
             f"**Question Set ID:** `{question_set_hash}`" if question_set_hash else "**Question Set ID:** _(not recorded)_",
             "",
+        ]
+
+        # Trust block — placed right after header, before stats
+        if trust_verdict is not None:
+            lines.append(format_trust_block(trust_verdict))
+
+        lines += [
             "## Overall Statistics",
             "",
             "| Metric | WITH Docs | WITHOUT Docs | Delta |",

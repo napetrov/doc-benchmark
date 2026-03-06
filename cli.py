@@ -1214,6 +1214,11 @@ def build_parser() -> argparse.ArgumentParser:
                                   "Skips question generation entirely — essential for fair multi-model "
                                   "comparisons (all models evaluated on the same question set). "
                                   "Example: --questions-from results/onedal_gpt4o")
+    bench_run_p.add_argument("--multi-run", type=int, default=1, dest="multi_run",
+                             metavar="N",
+                             help="Run answer generation + evaluation N times (default: 1). "
+                                  "N>=3 enables variance check in the trust gate. "
+                                  "Results are averaged; variance is measured for stability.")
     bench_run_p.set_defaults(func=cmd_benchmark_run)
 
     # benchmark batch — multiple libraries
@@ -1376,6 +1381,7 @@ def _run_single_library(entry, output_dir: str, model: str, provider: str, judge
 
 def cmd_benchmark_run(args: argparse.Namespace) -> None:
     """Run full evaluation pipeline for a single registered library."""
+    import statistics as _stats
     registry = _load_registry(args)
     try:
         entry = registry.get(args.library)
@@ -1384,19 +1390,66 @@ def cmd_benchmark_run(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     output_dir = args.output_dir or f"results/{entry.key}"
-    _run_single_library(
-        entry,
-        output_dir=output_dir,
-        model=args.model,
-        provider=args.provider,
-        judge_model=args.judge_model,
-        judge_provider=getattr(args, "judge_provider", "openai"),
-        doc_source_override=getattr(args, "doc_source", None),
-        max_tokens_per_question=getattr(args, "max_tokens", 4000),
-        force_regen=getattr(args, "force_regen", False),
-        concurrency=getattr(args, "concurrency", 5),
-        questions_from=getattr(args, "questions_from", None),
-    )
+    n_runs = max(1, getattr(args, "multi_run", 1))
+    concurrency = getattr(args, "concurrency", 5)
+    questions_from = getattr(args, "questions_from", None)
+
+    if n_runs == 1:
+        _run_single_library(
+            entry,
+            output_dir=output_dir,
+            model=args.model,
+            provider=args.provider,
+            judge_model=args.judge_model,
+            judge_provider=getattr(args, "judge_provider", "openai"),
+            doc_source_override=getattr(args, "doc_source", None),
+            max_tokens_per_question=getattr(args, "max_tokens", 4000),
+            force_regen=getattr(args, "force_regen", False),
+            concurrency=concurrency,
+            questions_from=questions_from,
+        )
+    else:
+        # Multi-run mode: generate questions once (run 1), then evaluate N times
+        print(f"\n🔁 Multi-run mode: {n_runs} evaluation passes")
+        run_averages = []
+        first_run_dir = f"{output_dir}_run1"
+
+        for i in range(1, n_runs + 1):
+            run_dir = f"{output_dir}_run{i}" if n_runs > 1 else output_dir
+            # All runs after run 1 reuse questions from run 1
+            qfrom = questions_from if questions_from else (first_run_dir if i > 1 else None)
+            print(f"\n  ── Run {i}/{n_runs} → {run_dir}")
+            r = _run_single_library(
+                entry,
+                output_dir=run_dir,
+                model=args.model,
+                provider=args.provider,
+                judge_model=args.judge_model,
+                judge_provider=getattr(args, "judge_provider", "openai"),
+                doc_source_override=getattr(args, "doc_source", None),
+                max_tokens_per_question=getattr(args, "max_tokens", 4000),
+                force_regen=(getattr(args, "force_regen", False) and i == 1),
+                concurrency=concurrency,
+                questions_from=qfrom,
+            )
+            # Extract per-run WITH-docs average from result
+            try:
+                eval_summary = r["result"]["steps"]["evaluation"]["summary"]
+                run_averages.append(eval_summary["with_avg"])
+            except (KeyError, TypeError):
+                pass
+
+        # Summary across runs
+        if run_averages:
+            std = _stats.stdev(run_averages) if len(run_averages) > 1 else 0.0
+            mean = _stats.mean(run_averages)
+            print(f"\n📊 Multi-run summary ({n_runs} runs):")
+            print(f"   WITH-docs avg: {mean:.1f} ± {std:.2f} (std)")
+            for idx, avg in enumerate(run_averages, 1):
+                print(f"   Run {idx}: {avg:.1f}")
+            if std > 5.0:
+                print("   ⚠️  High variance — scores are unstable (std > 5)")
+
     print(f"\n✅ Done: {entry.name}")
 
 
@@ -1434,6 +1487,7 @@ def cmd_benchmark_batch(args: argparse.Namespace) -> None:
                 judge_provider=getattr(args, "judge_provider", "openai"),
                 max_tokens_per_question=getattr(args, "max_tokens", 4000),
                 force_regen=getattr(args, "force_regen", False),
+                concurrency=getattr(args, "concurrency", 5),
             )
             results.append(r)
         except Exception as exc:
