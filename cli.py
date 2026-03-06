@@ -1209,6 +1209,11 @@ def build_parser() -> argparse.ArgumentParser:
                              help="Parallel API calls for answering and judging (default: 5)")
     bench_run_p.add_argument("--force-regen", action="store_true", dest="force_regen",
                              help="Regenerate personas/questions even if cached files exist")
+    bench_run_p.add_argument("--questions-from", default=None, dest="questions_from",
+                             help="Reuse questions from another run's output directory or JSON file. "
+                                  "Skips question generation entirely — essential for fair multi-model "
+                                  "comparisons (all models evaluated on the same question set). "
+                                  "Example: --questions-from results/onedal_gpt4o")
     bench_run_p.set_defaults(func=cmd_benchmark_run)
 
     # benchmark batch — multiple libraries
@@ -1328,7 +1333,7 @@ def cmd_library_show(args: argparse.Namespace) -> None:
     print(f"Description  :\n  {entry.description}")
 
 
-def _run_single_library(entry, output_dir: str, model: str, provider: str, judge_model: str, judge_provider: str = "openai", doc_source_override=None, max_tokens_per_question: int = 4000, force_regen: bool = False, concurrency: int = 5) -> dict:
+def _run_single_library(entry, output_dir: str, model: str, provider: str, judge_model: str, judge_provider: str = "openai", doc_source_override=None, max_tokens_per_question: int = 4000, force_regen: bool = False, concurrency: int = 5, questions_from=None) -> dict:
     """Run full evaluation pipeline for one LibraryEntry. Returns result dict."""
     from doc_benchmarks.orchestrator import EvaluationPipeline
     from pathlib import Path as _Path
@@ -1363,6 +1368,7 @@ def _run_single_library(entry, output_dir: str, model: str, provider: str, judge
         doc_source=doc_source,
         max_tokens_per_question=max_tokens_per_question,
         force_regen=force_regen,
+        questions_from=questions_from,
     )
     result = pipeline.run(concurrency=concurrency)
     return {"library": entry.key, "name": entry.name, "status": "ok", "result": result}
@@ -1389,6 +1395,7 @@ def cmd_benchmark_run(args: argparse.Namespace) -> None:
         max_tokens_per_question=getattr(args, "max_tokens", 4000),
         force_regen=getattr(args, "force_regen", False),
         concurrency=getattr(args, "concurrency", 5),
+        questions_from=getattr(args, "questions_from", None),
     )
     print(f"\n✅ Done: {entry.name}")
 

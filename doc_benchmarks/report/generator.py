@@ -80,6 +80,7 @@ class ReportGenerator:
         answer_provider = run_meta.get("answer_provider")
         judge_model = run_meta.get("judge_model")
         judge_provider = run_meta.get("judge_provider")
+        question_set_hash = run_meta.get("question_set_hash")
         evaluator_independence_warning = bool(
             run_meta.get("evaluator_independence_warning")
             or (
@@ -105,6 +106,7 @@ class ReportGenerator:
                     "answer_provider": answer_provider,
                     "judge_model": judge_model,
                     "judge_provider": judge_provider,
+                    "question_set_hash": question_set_hash,
                 },
             }, indent=2)
         else:
@@ -117,6 +119,7 @@ class ReportGenerator:
                 answer_provider=answer_provider,
                 judge_model=judge_model,
                 judge_provider=judge_provider,
+                question_set_hash=question_set_hash,
             )
     
     def _compute_stats(self, evaluations: List[Dict]) -> Dict[str, Any]:
@@ -291,12 +294,14 @@ class ReportGenerator:
         answer_provider: Optional[str] = None,
         judge_model: Optional[str] = None,
         judge_provider: Optional[str] = None,
+        question_set_hash: Optional[str] = None,
     ) -> str:
         """Format report as Markdown."""
         lines = [
             "# Documentation Quality Report",
             "",
             f"**Total Questions:** {stats['total_questions']}",
+            f"**Question Set ID:** `{question_set_hash}`" if question_set_hash else "**Question Set ID:** _(not recorded)_",
             "",
             "## Overall Statistics",
             "",
