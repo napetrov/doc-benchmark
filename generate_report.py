@@ -62,7 +62,7 @@ def significance_test(evals):
         except Exception:
             result["p_wilcoxon"] = None
         result["cohens_d"] = round(d_mean / d_std, 3) if d_std > 0 else 0.0
-        result["significant"] = p_ttest < 0.05
+        result["significant"] = bool(p_ttest < 0.05)
     else:
         result["significant"] = None  # cannot determine without scipy
 
