@@ -109,6 +109,7 @@ def generate_comparison(runs: dict, out_path: str):
         "| Run ID | Answer model | Judge model |",
         "|---|---|---|",
     ]
+    question_hashes = {}
     for lbl, v in loaded.items():
         m = v["meta"]
         jp = v["data"].get("judge_provider", "?")
@@ -119,6 +120,24 @@ def generate_comparison(runs: dict, out_path: str):
             f'| **{lbl}** | {m.get("answer_model","?")} ({m.get("answer_provider","?")}) '
             f'| {v["data"].get("judge_model","?")} ({jp}) |'
         )
+        question_hashes[lbl] = m.get("question_set_hash")
+
+    # Reproducibility guardrail: all compared runs must use the same question set
+    unique_hashes = {h for h in question_hashes.values() if h}
+    lines += ["", "### Question Set Consistency", "", "| Run ID | Question Set ID |", "|---|---|",]
+    for lbl in labels:
+        lines.append(f"| **{lbl}** | `{question_hashes.get(lbl) or 'missing'}` |")
+    if len(unique_hashes) > 1:
+        lines += [
+            "",
+            "⚠️ **Warning:** compared runs use DIFFERENT `question_set_hash` values. "
+            "Cross-model comparison may be unfair.",
+        ]
+    elif len(unique_hashes) == 1:
+        lines += ["", f"✅ All runs use the same question set: `{next(iter(unique_hashes))}`"]
+    else:
+        lines += ["", "ℹ️ Question Set ID missing in metadata for all runs."]
+
     lines += ["", f"Common questions evaluated: **{len(common_valid)}**", ""]
 
     # --- Overall summary ---
