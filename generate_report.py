@@ -18,6 +18,12 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 try:
+    from scipy import stats as sp_stats
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+
+try:
     from zoneinfo import ZoneInfo
     _TZ = ZoneInfo("America/Los_Angeles")
 except ImportError:
@@ -26,6 +32,41 @@ except ImportError:
 
 def avg(lst):
     return round(sum(lst) / len(lst), 1) if lst else 0.0
+
+
+def significance_test(evals):
+    """Compute paired t-test, Wilcoxon, and Cohen's d on (with_docs - without_docs) pairs."""
+    pairs = []
+    for e in evals:
+        w = (e.get("with_docs") or {}).get("aggregate")
+        wo = (e.get("without_docs") or {}).get("aggregate")
+        if w is not None and wo is not None:
+            pairs.append((w, wo))
+    if len(pairs) < 5:
+        return None
+    with_s = [p[0] for p in pairs]
+    without_s = [p[1] for p in pairs]
+    deltas = [p[0] - p[1] for p in pairs]
+    d_mean = sum(deltas) / len(deltas)
+    d_std = (sum((x - d_mean) ** 2 for x in deltas) / len(deltas)) ** 0.5
+
+    result = {"n": len(pairs), "delta_mean": round(d_mean, 2), "delta_std": round(d_std, 2)}
+
+    if HAS_SCIPY:
+        t_stat, p_ttest = sp_stats.ttest_rel(with_s, without_s)
+        result["t_stat"] = round(t_stat, 3)
+        result["p_ttest"] = round(p_ttest, 4)
+        try:
+            _, p_wilcox = sp_stats.wilcoxon(deltas)
+            result["p_wilcoxon"] = round(p_wilcox, 4)
+        except Exception:
+            result["p_wilcoxon"] = None
+        result["cohens_d"] = round(d_mean / d_std, 3) if d_std > 0 else 0.0
+        result["significant"] = p_ttest < 0.05
+    else:
+        result["significant"] = None  # cannot determine without scipy
+
+    return result
 
 
 def has_scores(e):
@@ -168,6 +209,29 @@ def generate_report(eval_path: str, out_path: str, qa_json_out: str | None = Non
         f'| Golden (static) | {static_stats["count"]} | {static_stats["with_avg"]} | {static_stats["without_avg"]} | **{static_stats["delta_avg"]:+}** |',
         "",
     ]
+
+    # Statistical significance
+    sig = significance_test(evals)
+    if sig:
+        sig_label = ("✅ **Statistically significant** (p < 0.05)" if sig.get("significant")
+                     else "❌ **Not statistically significant** (p ≥ 0.05)" if sig.get("significant") is False
+                     else "⚠️ Cannot determine (scipy not installed)")
+        effect = abs(sig.get("cohens_d", 0))
+        effect_label = "negligible" if effect < 0.2 else "small" if effect < 0.5 else "medium" if effect < 0.8 else "large"
+        lines += [
+            "## Statistical Significance",
+            f"_Is the delta ({sig['delta_mean']:+}) meaningful for n={sig['n']} questions?_",
+            "",
+            f"**Verdict: {sig_label}**",
+            "",
+            "| Metric | Value |",
+            "|---|---|",
+            f"| Paired t-test p-value | {sig.get('p_ttest', 'N/A')} |",
+            f"| Wilcoxon signed-rank p | {sig.get('p_wilcoxon', 'N/A')} |",
+            f"| Cohen's d (effect size) | {sig.get('cohens_d', 'N/A')} ({effect_label}) |",
+            f"| Delta mean ± std | {sig['delta_mean']:+} ± {sig['delta_std']} |",
+            "",
+        ]
 
     # Dynamic vs Static breakdown
     lines += [

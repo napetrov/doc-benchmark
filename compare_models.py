@@ -17,6 +17,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 try:
+    from scipy import stats as sp_stats
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+
+try:
     from zoneinfo import ZoneInfo
     _TZ = ZoneInfo("America/Los_Angeles")
 except ImportError:
@@ -128,6 +134,35 @@ def generate_comparison(runs: dict, out_path: str):
             f'| **{s["delta_avg"]:+}** | {s["improvements"]} | {s["degradations"]} |'
         )
     lines.append("")
+
+    # --- Statistical significance per model ---
+    if HAS_SCIPY:
+        lines += [
+            "## Statistical Significance of Delta (α = 0.05)",
+            "_Is each model's delta (WITH − WITHOUT) statistically meaningful?_",
+            "",
+            "| Run | Delta | p (t-test) | p (Wilcoxon) | Cohen's d | Effect | Significant? |",
+            "|---|---:|---:|---:|---:|---|---|",
+        ]
+        for lbl, v in loaded.items():
+            valid_evals = [e for e in v["evals"].values() if has_scores(e)]
+            with_s = [e["with_docs"]["aggregate"] for e in valid_evals]
+            without_s = [e["without_docs"]["aggregate"] for e in valid_evals]
+            deltas_list = [w - wo for w, wo in zip(with_s, without_s)]
+            if len(deltas_list) < 5:
+                continue
+            d_mean = sum(deltas_list) / len(deltas_list)
+            d_std = (sum((x - d_mean) ** 2 for x in deltas_list) / len(deltas_list)) ** 0.5
+            t_stat, p_t = sp_stats.ttest_rel(with_s, without_s)
+            try:
+                _, p_w = sp_stats.wilcoxon(deltas_list)
+            except Exception:
+                p_w = 1.0
+            cd = d_mean / d_std if d_std > 0 else 0
+            effect = "negligible" if abs(cd) < 0.2 else "small" if abs(cd) < 0.5 else "medium" if abs(cd) < 0.8 else "large"
+            sig_mark = "✅ Yes" if p_t < 0.05 else "❌ No"
+            lines.append(f"| **{lbl}** | {d_mean:+.1f} | {p_t:.4f} | {p_w:.4f} | {cd:+.3f} | {effect} | {sig_mark} |")
+        lines.append("")
 
     # --- Static vs Dynamic ---
     lines += [
