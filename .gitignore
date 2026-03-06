@@ -13,3 +13,4 @@ cr.md
 docs-quality-report/
 baselines/eval/*.json
 *.tar.gz
+vendor_docs/
