@@ -1299,7 +1299,7 @@ def cmd_library_show(args: argparse.Namespace) -> None:
     print(f"Description  :\n  {entry.description}")
 
 
-def _run_single_library(entry, output_dir: str, model: str, provider: str, judge_model: str, judge_provider: str = "openai", doc_source_override=None, max_tokens_per_question: int = 4000, force_regen: bool = False) -> dict:
+def _run_single_library(entry, output_dir: str, model: str, provider: str, judge_model: str, judge_provider: str = "openai", doc_source_override=None, max_tokens_per_question: int = 4000, force_regen: bool = False, concurrency: int = 5, questions_from=None) -> dict:
     """Run full evaluation pipeline for one LibraryEntry. Returns result dict."""
     from doc_benchmarks.orchestrator import EvaluationPipeline
     from pathlib import Path as _Path
@@ -1334,8 +1334,9 @@ def _run_single_library(entry, output_dir: str, model: str, provider: str, judge
         doc_source=doc_source,
         max_tokens_per_question=max_tokens_per_question,
         force_regen=force_regen,
+        questions_from=questions_from,
     )
-    result = pipeline.run()
+    result = pipeline.run(concurrency=concurrency)
     return {"library": entry.key, "name": entry.name, "status": "ok", "result": result}
 
 
@@ -1447,6 +1448,7 @@ def cmd_benchmark_batch(args: argparse.Namespace) -> None:
                 judge_provider=getattr(args, "judge_provider", "openai"),
                 max_tokens_per_question=getattr(args, "max_tokens", 4000),
                 force_regen=getattr(args, "force_regen", False),
+                concurrency=getattr(args, "concurrency", 5),
             )
             results.append(r)
         except Exception as exc:

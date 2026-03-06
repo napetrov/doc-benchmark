@@ -89,6 +89,7 @@ class ReportGenerator:
         answer_provider = run_meta.get("answer_provider")
         judge_model = run_meta.get("judge_model")
         judge_provider = run_meta.get("judge_provider")
+        question_set_hash = run_meta.get("question_set_hash")
         evaluator_independence_warning = bool(
             run_meta.get("evaluator_independence_warning")
             or (
