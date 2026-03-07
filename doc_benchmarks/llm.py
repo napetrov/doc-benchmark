@@ -84,6 +84,8 @@ def _build_litellm_model(model: str, provider: str) -> str:
     """Build litellm model string from model + provider."""
     if provider == "openrouter":
         return model if model.startswith("openrouter/") else f"openrouter/{model}"
+    elif provider == "openai-codex":
+        return f"openai/{model}"
     elif "/" in model:
         return model
     elif provider == "openai":
@@ -131,7 +133,7 @@ def llm_call_with_usage(
     api_key: Optional[str] = None,
     max_retries: int = 3,
     retry_delay: float = 2.0,
-) -> tuple:
+) -> "tuple[str, dict]":
     """Like llm_call, but returns (text, usage_dict).
 
     usage_dict keys: prompt_tokens, completion_tokens, total_tokens.

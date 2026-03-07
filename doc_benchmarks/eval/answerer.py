@@ -83,9 +83,14 @@ class Answerer:
             self.llm = ChatOpenAI(model=model, api_key=api_key)
         elif provider == "anthropic":
             self.llm = ChatAnthropic(model=model, api_key=api_key)
+        elif provider in ("google", "gemini", "google-vertex", "openrouter",
+                          "amazon-bedrock", "vertex_ai"):
+            self.llm = None  # llm_call_with_usage handles these natively
         else:
-            from doc_benchmarks.utils import get_llm
-            self.llm = get_llm(provider, model, api_key)
+            raise ValueError(
+                f"Unsupported provider: '{provider}'. "
+                "Use 'openai', 'anthropic', 'google', 'openrouter', or 'amazon-bedrock'."
+            )
         self.top_k = top_k
         self.debug_retrieval = debug_retrieval
         
@@ -326,10 +331,13 @@ class Answerer:
                                 "context_chars": 0},
             }
 
+        # ~4k tokens at ~4 chars/token; keeps prompt within most models' context window
+        MAX_DOC_CHARS = 15_000
+
         # Format docs
         docs_text = "\n\n---\n\n".join(d["content"] for d in docs)
         context_chars = len(docs_text)
-        docs_text_trimmed = docs_text[:15000]  # Limit to avoid token overflow
+        docs_text_trimmed = docs_text[:MAX_DOC_CHARS]
 
         # Generate answer
         prompt = ANSWER_PROMPT_WITH_DOCS.format(
