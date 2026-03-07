@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-import pandas as pd
 
 from doc_benchmarks.eval.ragas_eval import RagasEvaluator, RagasResult
 
@@ -46,8 +45,9 @@ def sample_answers():
     ]
 
 
-def _make_ragas_result_df(n_rows: int) -> pd.DataFrame:
-    """Build a fake RAGAS result dataframe."""
+def _make_ragas_result_df(n_rows: int):
+    """Build a fake RAGAS result dataframe (lazy pandas import)."""
+    import pandas as pd
     return pd.DataFrame({
         "question": [f"q{i}" for i in range(n_rows)],
         "answer": [f"a{i}" for i in range(n_rows)],
@@ -60,7 +60,7 @@ def _make_ragas_result_df(n_rows: int) -> pd.DataFrame:
 
 class _FakeRagasResult:
     """Mimics ragas.evaluation.Result."""
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df):
         self._df = df
     def to_pandas(self):
         return self._df
