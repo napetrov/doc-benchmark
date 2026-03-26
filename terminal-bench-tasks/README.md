@@ -17,7 +17,7 @@ This complements the existing `eval/` Q&A benchmark with **coding-task evaluatio
 
 Each task follows the [Harbor task format](https://harborframework.com/docs/tasks):
 
-```
+```text
 terminal-bench-tasks/<task-name>/
   instruction.md          # Natural-language task description shown to the agent
   task.toml               # Config: timeouts, Docker image, metadata

@@ -26,7 +26,7 @@ using `std::sort` (single-threaded). Your task is to rewrite it to use
 ## What success looks like
 
 Running `/app/sort_parallel` should print a single line:
-```
+```text
 SORTED
 ```
 and exit with code 0.
