@@ -25,7 +25,7 @@ jobs:
             -t intel-hpc-bench/onetbb:latest \
             terminal-bench-tasks/onetbb-parallel-sort/environment/
 
-      - name: Run oracle solution inside container
+      - name: Run oracle solution + verifier inside container
         run: |
           docker run --rm \
             --cpus=2 \
@@ -34,17 +34,7 @@ jobs:
             -v "${{ github.workspace }}/terminal-bench-tasks/onetbb-parallel-sort/tests:/tests:ro" \
             -v /tmp/logs:/logs \
             intel-hpc-bench/onetbb:latest \
-            bash /solution/solve.sh
-
-      - name: Run verifier (pytest tests)
-        run: |
-          docker run --rm \
-            --cpus=2 \
-            --memory=2g \
-            -v "${{ github.workspace }}/terminal-bench-tasks/onetbb-parallel-sort/tests:/tests:ro" \
-            -v /tmp/logs:/logs \
-            intel-hpc-bench/onetbb:latest \
-            bash /tests/test.sh
+            bash -c "bash /solution/solve.sh && bash /tests/test.sh"
 
       - name: Check reward == 1
         run: |
