@@ -4,7 +4,7 @@ You are given `/app/stencil.cpp`, a serial C++17 implementation of a simple 2D f
 
 Create a oneTBB implementation that:
 
-1. Initializes an `n x n` grid deterministically.
+1. Initializes grid entries exactly as `grid[i,j] = (i * 17 + j * 13) % 101`.
 2. Applies the update for the interior cells: `out[i,j] = 0.25 * (up + down + left + right)`.
 3. Repeats the stencil for the requested number of iterations.
 4. Computes a norm and prints a line containing `VALID`.
@@ -12,7 +12,7 @@ Create a oneTBB implementation that:
 
 Requirements:
 
-- Use oneTBB parallelism, preferably `tbb::parallel_for` / `oneapi::tbb::parallel_for` with `blocked_range2d` or another tiled approach.
+- Use oneTBB parallelism with `tbb::parallel_for` / `oneapi::tbb::parallel_for` and `blocked_range2d` for the tiled stencil update.
 - Do not update boundary cells in the stencil loop.
 - Accept optional CLI arguments: `<grid_size> <iterations>`.
 

@@ -39,19 +39,22 @@ int main(int argc, char** argv) {
     }
 
     double err = 0.0;
+    double signature = 0.0;
     const int probes[][2] = {{0, 0}, {n / 3, n / 5}, {n - 1, n - 1}, {n / 2, n / 2}};
     for (auto& p : probes) {
         const int i = p[0];
         const int j = p[1];
         const double expected = static_cast<double>(i * n + j + iterations - 1);
-        err += std::abs(b[static_cast<std::size_t>(j) * n + i] - expected);
+        const double actual = b[static_cast<std::size_t>(j) * n + i];
+        err += std::abs(actual - expected);
+        signature += actual;
     }
 
     if (err > 1e-8) {
         std::cerr << "TRANSPOSE_ERROR err=" << err << "\n";
         return 1;
     }
-    std::cout << "VALID transpose err=" << err << "\n";
+    std::cout << "VALID transpose signature=" << signature << "\n";
     return 0;
 }
 CPP

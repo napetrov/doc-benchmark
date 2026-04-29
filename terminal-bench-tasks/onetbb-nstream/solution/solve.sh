@@ -15,6 +15,10 @@ int main(int argc, char** argv) {
     const int iterations = argc > 1 ? std::atoi(argv[1]) : 20;
     const std::size_t length = argc > 2 ? std::strtoull(argv[2], nullptr, 10) : 2000000;
     const double scalar = 3.0;
+    if (iterations < 1 || length == 0) {
+        std::cerr << "INVALID_ARGUMENTS\n";
+        return 2;
+    }
     oneapi::tbb::global_control limit(oneapi::tbb::global_control::max_allowed_parallelism, 4);
 
     std::vector<double> a(length), b(length), c(length);
@@ -24,7 +28,7 @@ int main(int argc, char** argv) {
         }
     });
 
-    for (int iter = 0; iter <= iterations; ++iter) {
+    for (int iter = 0; iter < iterations; ++iter) {
         oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, length), [&](const auto& r) {
             for (std::size_t i = r.begin(); i != r.end(); ++i) {
                 a[i] += b[i] + scalar * c[i];
@@ -40,7 +44,8 @@ int main(int argc, char** argv) {
         },
         [](double x, double y) { return x + y; });
 
-    const double expected = static_cast<double>(length) * (iterations + 1) * (2.0 + scalar * 2.0);
+    const double expected = static_cast<double>(length) * iterations * (2.0 + scalar * 2.0);
+    if (!(expected > 0.0)) return 2;
     const double relerr = std::abs(observed - expected) / expected;
     if (relerr > 1e-8) {
         std::cerr << "CHECKSUM_MISMATCH observed=" << observed << " expected=" << expected << "\n";

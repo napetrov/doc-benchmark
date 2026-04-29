@@ -44,7 +44,8 @@ jobs:
           do
             mkdir -p "/tmp/logs/${task}"
             docker run --rm \
-              --cpus=2 \
+              --network none \
+              --cpus=4 \
               --memory=2g \
               -v "${{ github.workspace }}/terminal-bench-tasks/${task}/solution:/solution:ro" \
               -v "${{ github.workspace }}/terminal-bench-tasks/${task}/tests:/tests:ro" \

@@ -8,8 +8,8 @@ from pathlib import Path
 
 BINARY = Path("/app/nstream_tbb")
 SERIAL = Path("/app/nstream_serial")
+TARGET_SOURCE = Path("/app/nstream_tbb.cpp")
 ARGS = ['20', '2000000']
-SOURCE_CANDIDATES = [Path("/app/nstream_tbb.cpp"), *Path('/app').glob('*.cpp')]
 KEYWORDS = ['parallel_for', 'parallel_reduce', 'oneapi/tbb']
 TIMEOUT_SEC = 8.0
 
@@ -32,6 +32,8 @@ def _last_number(text):
 def test_binary_exists():
     assert BINARY.exists(), f"{BINARY} not found; compile the required oneTBB binary"
     assert os.access(BINARY, os.X_OK), f"{BINARY} is not executable"
+    assert SERIAL.exists(), f"{SERIAL} not found; serial reference binary is required"
+    assert os.access(SERIAL, os.X_OK), f"{SERIAL} is not executable"
 
 
 def test_binary_matches_serial_reference():
@@ -48,12 +50,7 @@ def test_binary_matches_serial_reference():
 
 
 def test_source_uses_onetbb():
-    checked = []
-    text = ""
-    for src in SOURCE_CANDIDATES:
-        if src.exists():
-            checked.append(str(src))
-            text += "\n" + src.read_text(errors='replace')
-    assert checked, "no C++ source files found under /app"
+    assert TARGET_SOURCE.exists(), f"{TARGET_SOURCE} not found"
+    text = TARGET_SOURCE.read_text(errors="replace")
     missing = [kw for kw in KEYWORDS if kw not in text]
-    assert not missing, f"missing required oneTBB/source markers {missing} in sources {checked}"
+    assert not missing, f"missing required oneTBB/source markers {missing} in {TARGET_SOURCE}"
