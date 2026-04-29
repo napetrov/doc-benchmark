@@ -45,17 +45,48 @@ def sample_answers():
     ]
 
 
+class _FakeSeries:
+    def __init__(self, values):
+        self._values = values
+
+    def dropna(self):
+        return self
+
+    def tolist(self):
+        return self._values
+
+
+class _FakeILoc:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def __getitem__(self, idx):
+        return self._rows[idx]
+
+
+class _FakeDataFrame:
+    def __init__(self, rows):
+        self._rows = rows
+        self.columns = list(rows[0].keys()) if rows else []
+        self.iloc = _FakeILoc(rows)
+
+    def __getitem__(self, col):
+        return _FakeSeries([row[col] for row in self._rows])
+
+
 def _make_ragas_result_df(n_rows: int):
-    """Build a fake RAGAS result dataframe (lazy pandas import)."""
-    import pandas as pd
-    return pd.DataFrame({
-        "question": [f"q{i}" for i in range(n_rows)],
-        "answer": [f"a{i}" for i in range(n_rows)],
-        "contexts": [["ctx"] for _ in range(n_rows)],
-        "faithfulness": [0.8] * n_rows,
-        "answer_relevancy": [0.75] * n_rows,
-        "context_precision": [0.9] * n_rows,
-    })
+    """Build a fake RAGAS result dataframe without requiring pandas in CI."""
+    return _FakeDataFrame([
+        {
+            "question": f"q{i}",
+            "answer": f"a{i}",
+            "contexts": ["ctx"],
+            "faithfulness": 0.8,
+            "answer_relevancy": 0.75,
+            "context_precision": 0.9,
+        }
+        for i in range(n_rows)
+    ])
 
 
 class _FakeRagasResult:
