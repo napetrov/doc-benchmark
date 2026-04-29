@@ -3,7 +3,7 @@
 `doc-benchmark` is a toolkit for measuring and improving technical documentation quality. It supports two complementary workflows:
 
 1. **Static documentation quality checks** over Markdown/code examples: coverage, freshness, readability, example execution, gates, and regression detection.
-2. **LLM-assisted product documentation evaluation**: persona and question generation, answer generation with/without documentation context, LLM-as-judge scoring, multi-judge panels, RAGAS meta-evaluation, dashboards, and executable terminal-bench style tasks.
+2. **LLM-assisted product documentation evaluation**: persona and question generation, answer generation with/without documentation context, LLM-as-judge scoring, multi-judge panels, RAGAS meta-evaluation, dashboards, and executable terminal-bench-style tasks.
 
 The repository is currently focused on Intel library documentation quality experiments, especially oneTBB, oneDAL, and oneMKL.
 
@@ -105,11 +105,11 @@ python cli.py eval ragas ...
 python cli.py dashboard generate ...
 ```
 
-Generated artifacts should normally go under `results/`, `reports/`, `answers/`, `eval/`, or `baselines/` depending on whether they are temporary run outputs or curated fixtures. Temporary outputs are ignored by default; only intentional fixtures should be committed.
+Generated artifacts should normally go under `results/`, `reports/`, or `baselines/current.json` for temporary runs; those paths are ignored by default. Curated fixtures under `answers/`, `eval/`, `baselines/`, `personas/`, and `questions/` may be committed intentionally when they are part of a reproducible benchmark.
 
 ## Executable oneTBB tasks
 
-The repository includes terminal-bench style tasks under `terminal-bench-tasks/`. These tasks validate not just text answers but working code and measurable behavior. Current CI verifies oracle solutions for the included oneTBB task.
+The repository includes terminal-bench-style tasks under `terminal-bench-tasks/`. These tasks validate not just text answers but working code and measurable behavior. Current CI verifies oracle solutions for the included oneTBB task.
 
 Planned next work is to derive additional oneTBB executable tasks from [ParRes/Kernels](https://github.com/ParRes/Kernels), with provenance/license checks before adapting code. Good first candidates are `nstream`, `stencil`, `transpose`, `sparse`, and shared-memory adaptations of `p2p` patterns.
 
