@@ -23,10 +23,10 @@ def _run(cmd):
     return result.stdout, elapsed
 
 
-def _last_number(text):
-    nums = re.findall(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?", text)
-    assert nums, f"no numeric validation value found in {text!r}"
-    return float(nums[-1])
+def _last_integer(text):
+    nums = re.findall(r"\d+", text)
+    assert nums, f"no integer validation value found in {text!r}"
+    return int(nums[-1])
 
 
 def test_binary_exists():
@@ -36,14 +36,13 @@ def test_binary_exists():
     assert os.access(SERIAL, os.X_OK), f"{SERIAL} is not executable"
 
 
-def test_binary_matches_serial_reference():
+def test_binary_matches_serial_reference_exactly():
     serial_out, _ = _run([str(SERIAL), *ARGS])
     parallel_out, elapsed = _run([str(BINARY), *ARGS])
-    serial_value = _last_number(serial_out)
-    parallel_value = _last_number(parallel_out)
-    tolerance = max(1e-6, abs(serial_value) * 1e-8)
-    assert abs(serial_value - parallel_value) <= tolerance, (
-        f"parallel result {parallel_value} differs from serial reference {serial_value}"
+    serial_value = _last_integer(serial_out)
+    parallel_value = _last_integer(parallel_out)
+    assert parallel_value == serial_value, (
+        f"parallel signature {parallel_value} differs from serial reference {serial_value}"
     )
     assert elapsed < TIMEOUT_SEC, f"execution took {elapsed:.2f}s, expected under {TIMEOUT_SEC}s"
 

@@ -20,9 +20,9 @@ int main(int argc, char** argv) {
         prefix[i] = running;
     }
 
-    std::int64_t signature = prefix.back();
+    std::uint64_t signature = static_cast<std::uint64_t>(prefix.back());
     for (std::size_t i = 0; i < n; i += n / 17 + 1) {
-        signature = signature * 1315423911LL + prefix[i];
+        signature = signature * 1315423911ULL + static_cast<std::uint64_t>(prefix[i]);
     }
 
     std::cout << "VALID scan signature=" << signature << "\n";

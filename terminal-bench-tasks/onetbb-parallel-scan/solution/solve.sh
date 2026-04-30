@@ -52,9 +52,9 @@ int main(int argc, char** argv) {
     PrefixBody body(input, prefix);
     oneapi::tbb::parallel_scan(oneapi::tbb::blocked_range<std::size_t>(0, n), body);
 
-    std::int64_t signature = prefix.back();
+    std::uint64_t signature = static_cast<std::uint64_t>(prefix.back());
     for (std::size_t i = 0; i < n; i += n / 17 + 1) {
-        signature = signature * 1315423911LL + prefix[i];
+        signature = signature * 1315423911ULL + static_cast<std::uint64_t>(prefix[i]);
     }
 
     std::cout << "VALID scan signature=" << signature << "\n";
