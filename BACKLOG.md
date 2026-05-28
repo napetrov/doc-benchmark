@@ -4,6 +4,35 @@
 
 ---
 
+### #54 — Executable tasks for non-TBB oneAPI components
+**Scope:** Task generation / executable benchmarks
+**Status:** IN REVIEW
+
+Extend the terminal-bench task suite beyond oneTBB to the other Intel oneAPI
+components, each with an offline-verifiable validation strategy (serial-reference
+signature, analytic expected value, round-trip invariant, or drop-in comparison).
+
+Added in this batch (verified in a separate `terminal-bench-verify-oneapi` CI
+job so heavy Intel-apt-repo builds cannot affect the green oneTBB job):
+
+- `onemkl-dgemm` — `cblas_dgemm` vs serial triple-loop signature
+- `onemkl-fft` — DFTI forward/backward round-trip + spectrum vs naive DFT
+- `onedpl-transform-reduce` — `transform_reduce` (`par_unseq`) on the TBB backend
+- `ipp-dotprod` — `ippsDotProd_64f` vs serial reference
+- `oneccl-allreduce` — multi-rank MPI allreduce vs analytic `N*(N+1)/2`
+- `sklearnex-classification` — `patch_sklearn()` KNN vs stock scikit-learn
+
+Notes / follow-ups:
+- Serial references and verifier regexes validated locally; the Intel-apt-repo
+  images (MKL/IPP/oneCCL) and the pip/oneDPL images could not be Docker-built in
+  the authoring sandbox, so the `oneccl-allreduce` task in particular may need a
+  CI iteration (MPI/oneCCL transport under `--network none`).
+- Next candidates (per-component) tracked in `terminal-bench-tasks/COVERAGE.md`:
+  oneMKL RNG/LAPACK/sparse, oneDPL sort/scan, oneDNN primitives, IPP image
+  resize, IPP-CP AES, oneCCL allgather/reduce, sklearnex kmeans/pca, OpenMP.
+
+---
+
 ### #48 — Next oneTBB executable tasks: reduce, scan, flow graph
 **Scope:** Task generation / executable benchmarks
 **Status:** READY
