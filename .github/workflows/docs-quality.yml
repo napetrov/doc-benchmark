@@ -75,7 +75,7 @@ jobs:
           name: terminal-bench-logs
           path: /tmp/logs/
 
-  # Tasks that depend on the Intel oneAPI apt repo (oneMKL, IPP, oneCCL),
+  # Tasks that depend on the Intel oneAPI apt repo (oneMKL, IPP),
   # header-only oneDPL, or large pip installs (sklearnex). Each task is a
   # separate matrix leg (one check run per task, fail-fast disabled) so a
   # failure or heavy build in one cannot affect the core oneTBB job above and
@@ -92,7 +92,6 @@ jobs:
           - onemkl-fft
           - onedpl-transform-reduce
           - ipp-dotprod
-          - oneccl-allreduce
     steps:
       - uses: actions/checkout@v4
 

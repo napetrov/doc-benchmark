@@ -32,8 +32,12 @@ wheels at **build** time. The verifier still runs offline (`--network none`).
 | oneMKL | DFTI FFT | `onemkl-fft` | implemented | Dominant-bin + magnitude-sum vs naive DFT reference, forward/backward round-trip error; source markers |
 | oneDPL | `transform_reduce` + `par_unseq` | `onedpl-transform-reduce` | implemented | Sum-of-squares signature vs serial reference; runtime bound; source markers (`oneapi/dpl`, `transform_reduce`, `execution::par`) |
 | IPP | `ippsDotProd_64f` | `ipp-dotprod` | implemented | Dot-product signature vs serial reference; source markers (`ippsDotProd_64f`, `ipp.h`) |
-| oneCCL | `allreduce` over MPI | `oneccl-allreduce` | implemented (CI-pending) | Multi-rank sum vs analytic `N*(N+1)/2`; source markers (`oneapi/ccl.hpp`, `allreduce`) |
 | sklearnex | `patch_sklearn()` + KNN | `sklearnex-classification` | implemented | Accuracy within 0.02 of stock scikit-learn reference; source markers (`sklearnex`, `patch_sklearn`) |
+
+> A `oneccl-allreduce` task (multi-rank sum allreduce over MPI vs analytic
+> `N*(N+1)/2`) was prototyped but pulled from the first batch: the oneCCL/Intel
+> MPI transport needs iteration on a real image under `--network none`, which
+> couldn't be done in the authoring sandbox. It is tracked as a candidate below.
 
 ### Candidate tasks per component
 
@@ -47,7 +51,7 @@ wheels at **build** time. The verifier still runs offline (`--network none`).
 | oneDNN | `onednn-relu` / `onednn-gemm` | Single primitive output vs a serial reference array, exact within fp tolerance |
 | IPP | `ipp-image-resize` | `ippiResize` on a deterministic raster; verify pixel checksum vs a serial bilinear reference |
 | IPP-CP | `ippcp-aes` | AES-128 encrypt→decrypt round-trip recovers plaintext; KAT vector match |
-| oneCCL | `oneccl-allgather` / `oneccl-reduce` | Per-rank contributions vs analytic gathered/reduced result |
+| oneCCL | `oneccl-allreduce` / `oneccl-allgather` / `oneccl-reduce` | Per-rank contributions vs analytic gathered/reduced result; needs MPI/oneCCL transport working under `--network none` (Intel MPI `shm` fabric, `CCL_ATL_TRANSPORT=mpi`) |
 | sklearnex | `sklearnex-kmeans` / `sklearnex-pca` | Cluster inertia / explained-variance within tolerance of stock sklearn |
 | OpenMP | `openmp-reduce` | `#pragma omp parallel for reduction` checksum vs serial (offline, stock `-fopenmp`) |
 | oneDNN | `onednn-conv` | Small convolution vs a serial reference output tensor signature |
@@ -67,8 +71,8 @@ Validation patterns used across components:
    verifier runs both and compares within a tolerance. Used by every numeric
    task here.
 2. **Analytic expected value** — when a serial reference is awkward (e.g.
-   collectives), derive the answer in closed form (`oneccl-allreduce` uses
-   `N*(N+1)/2`).
+   collectives), derive the answer in closed form (a `oneccl-allreduce` task
+   would compare against `N*(N+1)/2`).
 3. **Round-trip invariants** — forward/backward transforms (FFT) or
    encrypt/decrypt (crypto) must recover the input within tolerance.
 4. **Drop-in reference** — for accelerator libraries (sklearnex), compare

@@ -12,24 +12,35 @@ Extend the terminal-bench task suite beyond oneTBB to the other Intel oneAPI
 components, each with an offline-verifiable validation strategy (serial-reference
 signature, analytic expected value, round-trip invariant, or drop-in comparison).
 
-Added in this batch (verified in a separate `terminal-bench-verify-oneapi` CI
-job so heavy Intel-apt-repo builds cannot affect the green oneTBB job):
+Added in this batch (verified per-task in the `terminal-bench-verify-oneapi`
+matrix CI job, isolated from the core oneTBB job):
 
 - `onemkl-dgemm` — `cblas_dgemm` vs serial triple-loop signature
 - `onemkl-fft` — DFTI forward/backward round-trip + spectrum vs naive DFT
 - `onedpl-transform-reduce` — `transform_reduce` (`par_unseq`) on the TBB backend
 - `ipp-dotprod` — `ippsDotProd_64f` vs serial reference
-- `oneccl-allreduce` — multi-rank MPI allreduce vs analytic `N*(N+1)/2`
 - `sklearnex-classification` — `patch_sklearn()` KNN vs stock scikit-learn
 
 Notes / follow-ups:
-- Serial references and verifier regexes validated locally; the Intel-apt-repo
-  images (MKL/IPP/oneCCL) and the pip/oneDPL images could not be Docker-built in
-  the authoring sandbox, so the `oneccl-allreduce` task in particular may need a
-  CI iteration (MPI/oneCCL transport under `--network none`).
+- `oneccl-allreduce` was prototyped but **removed from this batch**: oneCCL/Intel
+  MPI transport under `--network none` needs iteration on a real image, which
+  couldn't be done in the authoring sandbox (no nested Docker). Tracked as #55.
 - Next candidates (per-component) tracked in `terminal-bench-tasks/COVERAGE.md`:
   oneMKL RNG/LAPACK/sparse, oneDPL sort/scan, oneDNN primitives, IPP image
-  resize, IPP-CP AES, oneCCL allgather/reduce, sklearnex kmeans/pca, OpenMP.
+  resize, IPP-CP AES, oneCCL allreduce/allgather/reduce, sklearnex kmeans/pca,
+  OpenMP.
+
+---
+
+### #55 — oneCCL executable task (allreduce over MPI)
+**Scope:** Task generation / executable benchmarks
+**Status:** TODO
+
+Land `oneccl-allreduce` (prototyped in #54, removed before merge). A multi-rank
+sum allreduce verified against the analytic `N*(N+1)/2`. Needs to be iterated on
+a real Docker image with oneCCL + Intel MPI working under `--network none`
+(Intel MPI `shm` fabric, `CCL_ATL_TRANSPORT=mpi`, localhost in `/etc/hosts`,
+`mpirun` bootstrap). Add to the `terminal-bench-verify-oneapi` matrix when green.
 
 ---
 

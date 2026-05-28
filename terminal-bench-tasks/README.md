@@ -48,7 +48,6 @@ See [COVERAGE.md](./COVERAGE.md) for the broader oneTBB API/concept coverage mat
 | [onemkl-fft](./onemkl-fft/) | oneMKL | medium | DFTI forward/backward FFT round-trip + spectrum vs naive DFT |
 | [onedpl-transform-reduce](./onedpl-transform-reduce/) | oneDPL | medium | Parallel `transform_reduce` (`par_unseq`) on the oneTBB backend |
 | [ipp-dotprod](./ipp-dotprod/) | IPP | easy | Vector dot product with `ippsDotProd_64f` vs serial reference |
-| [oneccl-allreduce](./oneccl-allreduce/) | oneCCL | hard | Multi-rank sum `allreduce` over MPI vs analytic expected result |
 | [sklearnex-classification](./sklearnex-classification/) | sklearnex | easy | KNN classifier accelerated with `patch_sklearn()`, accuracy vs stock sklearn |
 
 > The oneTBB tasks build entirely from `ubuntu:22.04` + standard apt and are
@@ -117,7 +116,6 @@ Done:
 - [x] `onemkl-fft` — FFT round-trip via DFTI
 - [x] `onedpl-transform-reduce` — parallel STL `transform_reduce`
 - [x] `ipp-dotprod` — signal-processing dot product via `ippsDotProd_64f`
-- [x] `oneccl-allreduce` — multi-process allreduce with oneCCL + MPI
 - [x] `sklearnex-classification` — accelerated scikit-learn workflow
 
 Next candidates (see [COVERAGE.md](./COVERAGE.md) for the full plan + validation
@@ -129,3 +127,5 @@ strategies):
 - [ ] `ippcp-aes` — AES round-trip with IPP Cryptography
 - [ ] `openmp-reduce` — OpenMP parallel reduction (offline, stock `-fopenmp`)
 - [ ] `onedpl-sort` — `oneapi::dpl::sort` with a parallel policy
+- [ ] `oneccl-allreduce` — multi-process allreduce with oneCCL + MPI (needs
+      real-image iteration: MPI/oneCCL transport under `--network none`)

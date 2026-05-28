@@ -10,13 +10,13 @@ The `onetbb-nstream`, `onetbb-stencil`, and `onetbb-transpose` tasks are inspire
 
 The task implementations in this repository are simplified, independently written exercises for terminal-bench-style validation. They do not copy the ParRes source files verbatim and should not be reported as official ParRes or STREAM benchmark results. The purpose here is functional verification of oneTBB usage by coding agents, not system benchmarking.
 
-## oneMKL, oneDPL, IPP, oneCCL, sklearnex
+## oneMKL, oneDPL, IPP, sklearnex
 
-The `onemkl-*`, `onedpl-*`, `ipp-*`, `oneccl-*`, and `sklearnex-*` tasks are
-original exercises written for this repository. Their environments pull
-dependencies at **build** time only; the verifier runs offline:
+The `onemkl-*`, `onedpl-*`, `ipp-*`, and `sklearnex-*` tasks are original
+exercises written for this repository. Their environments pull dependencies at
+**build** time only; the verifier runs offline:
 
-- oneMKL, IPP, and oneCCL/MPI are installed from the Intel oneAPI apt repository
+- oneMKL and IPP are installed from the Intel oneAPI apt repository
   (`https://apt.repos.intel.com/oneapi`).
 - oneDPL is header-only and is fetched from the upstream repository
   ([uxlfoundation/oneDPL](https://github.com/uxlfoundation/oneDPL)) at a pinned
