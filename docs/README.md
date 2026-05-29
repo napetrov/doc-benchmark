@@ -31,3 +31,6 @@ current status.
 - [decisions/2026-02-12-review-devils-advocate.md](decisions/2026-02-12-review-devils-advocate.md)
 - [decisions/2026-02-12-review-intel-product.md](decisions/2026-02-12-review-intel-product.md)
 - [decisions/2026-02-14-context7-http-vs-mcp.md](decisions/2026-02-14-context7-http-vs-mcp.md)
+- [decisions/2026-05-29-evaluating-mcp-skills-personas.md](decisions/2026-05-29-evaluating-mcp-skills-personas.md)
+  — assessment + proposal for evaluating MCP docs, skills, and agent persona
+  prompts as first-class treatment arms.

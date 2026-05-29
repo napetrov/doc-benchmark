@@ -4,6 +4,33 @@
 
 ---
 
+### #56 — Evaluate MCP docs, skills, and agent persona prompts
+**Scope:** Evaluation architecture
+**Status:** ASSESSMENT
+
+Generalize the LLM track beyond the binary `with_docs`/`without_docs`
+doc-injection experiment so it can measure the marginal value of three new
+context-augmentation artifacts: MCP doc servers, agent skills, and agent
+persona (system) prompts.
+
+Assessment and proposed phasing in
+[docs/decisions/2026-05-29-evaluating-mcp-skills-personas.md](docs/decisions/2026-05-29-evaluating-mcp-skills-personas.md).
+
+Phases:
+- Phase 1 — agent persona prompts: parameterize the answerer system prompt,
+  add `agent_profiles/` fixtures, N-arm report (proves the treatment-arm model).
+- Phase 2 — MCP doc: real MCP-protocol retrieval client behind `factory.py`
+  (`mcp:<ref>`), injected sub-arm only.
+- Phase 3 — minimal agent (tool-calling) loop, reusing terminal-bench Docker
+  isolation; unlocks agentic MCP use and skill execution.
+- Phase 4 — skills as first-class: `skills/` fixtures, skill-as-context arm,
+  and skill-execution tasks on the terminal-bench track.
+
+Naming discipline: introduce `agent_profile` for the answerer's system prompt;
+reserve `persona` for the existing synthetic-user concept.
+
+---
+
 ### #54 — Executable tasks for non-TBB oneAPI components
 **Scope:** Task generation / executable benchmarks
 **Status:** IN REVIEW
