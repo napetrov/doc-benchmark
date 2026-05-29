@@ -78,6 +78,10 @@ def create_treatment(
 
     if spec.startswith("mcp:"):
         from doc_benchmarks.mcp.factory import create_doc_source_client
+        if not spec[len("mcp:"):].strip():
+            raise ValueError(
+                "'mcp:' arm requires a reference, e.g. 'mcp:http=https://mcp.context7.com/mcp'"
+            )
         client = create_doc_source_client(spec, cache_dir=cache_dir)
         return DocTreatment(
             client,

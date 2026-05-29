@@ -3,6 +3,11 @@
 from typing import Any, Dict, List
 
 
+def _md_cell(text: str) -> str:
+    """Make text safe for a single Markdown table cell."""
+    return (text or "").replace("\n", " ").replace("|", r"\|")
+
+
 def render_arms_report(data: Dict[str, Any]) -> str:
     """Render the artifact produced by ``ArmRunner.build_output`` as Markdown."""
     lines: List[str] = []
@@ -73,6 +78,7 @@ def render_arms_report(data: Dict[str, Any]) -> str:
         for ev in evaluations:
             q = ev.get("question_text", "")
             q_short = (q[:60] + "…") if len(q) > 60 else q
+            q_short = _md_cell(q_short)
             cells = []
             for arm in arms:
                 s = ev.get("scores", {}).get(arm)

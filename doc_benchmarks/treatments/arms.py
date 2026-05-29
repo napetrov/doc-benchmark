@@ -83,7 +83,12 @@ class DocTreatment(Treatment):
         if not raw_docs:
             return AgentConfig(metadata=metadata)
 
-        reranked = self.reranker.rerank(question_text, raw_docs)
+        try:
+            reranked = self.reranker.rerank(question_text, raw_docs)
+        except Exception:
+            logger.exception("Rerank failed for arm %s; using raw docs", self.name)
+            metadata["error"] = "rerank_failed"
+            reranked = raw_docs
         metadata["after_rerank"] = len(reranked)
         if not reranked:
             return AgentConfig(metadata=metadata)

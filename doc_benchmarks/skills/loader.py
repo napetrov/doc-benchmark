@@ -48,6 +48,8 @@ def _resolve_skill_file(path: Path) -> Path:
             raise FileNotFoundError(f"No SKILL.md found in skill directory: {path}")
         return candidate
     if path.is_file():
+        if path.name != "SKILL.md":
+            raise ValueError(f"Expected a SKILL.md file, got: {path}")
         return path
     raise FileNotFoundError(f"Skill path does not exist: {path}")
 
@@ -69,6 +71,8 @@ def load_skill(path) -> Skill:
     meta, body = parse_frontmatter(skill_file.read_text(encoding="utf-8"))
 
     name = str(meta.get("name") or skill_file.parent.name).strip()
+    if not name:
+        raise ValueError(f"Skill at '{skill_file}' has an empty 'name' after normalization.")
     description = str(meta.get("description") or "").strip()
     if not description:
         raise ValueError(

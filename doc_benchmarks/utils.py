@@ -23,7 +23,7 @@ def parse_frontmatter(text: str) -> "Tuple[Dict[str, Any], str]":
 
     stripped = text.lstrip("﻿")  # tolerate a UTF-8 BOM
     if not stripped.startswith("---"):
-        return {}, text
+        return {}, stripped
 
     lines = stripped.splitlines()
     # First line is the opening '---'; find the closing fence.

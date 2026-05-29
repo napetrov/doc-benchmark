@@ -1382,7 +1382,13 @@ def cmd_arms_run(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     questions_data = json.loads(Path(args.questions).read_text())
-    questions = questions_data.get("questions", questions_data)
+    if isinstance(questions_data, dict):
+        questions = questions_data.get("questions", questions_data)
+    else:
+        questions = questions_data
+    if not isinstance(questions, list):
+        print(f"Error: expected a list of questions in {args.questions}", file=sys.stderr)
+        sys.exit(1)
     print(f"Loaded {len(questions)} questions from {args.questions}")
 
     try:

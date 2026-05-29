@@ -36,6 +36,12 @@ def test_parse_frontmatter_unterminated():
     assert body == text
 
 
+def test_parse_frontmatter_strips_bom_when_no_frontmatter():
+    meta, body = parse_frontmatter("﻿hello")
+    assert meta == {}
+    assert body == "hello"  # BOM removed
+
+
 # ── baseline arm ────────────────────────────────────────────────────────
 def test_baseline_treatment():
     t = BaselineTreatment()
@@ -63,6 +69,13 @@ def test_agent_profile_loads_and_prepares():
 def test_agent_profile_empty_body_rejected(tmp_path):
     p = tmp_path / "empty.md"
     p.write_text("---\nid: e\n---\n\n")
+    with pytest.raises(ValueError):
+        load_agent_profile(p)
+
+
+def test_agent_profile_blank_id_rejected(tmp_path):
+    p = tmp_path / "blank.md"
+    p.write_text('---\nid: "   "\n---\nbody here')
     with pytest.raises(ValueError):
         load_agent_profile(p)
 
@@ -96,6 +109,21 @@ def test_skill_missing_description_rejected(tmp_path):
 def test_skill_missing_file(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_skill(tmp_path / "does-not-exist")
+
+
+def test_skill_rejects_non_skill_md_file(tmp_path):
+    p = tmp_path / "notes.md"
+    p.write_text("---\nname: x\ndescription: y\n---\nbody")
+    with pytest.raises(ValueError):
+        load_skill(p)
+
+
+def test_skill_blank_name_rejected(tmp_path):
+    d = tmp_path / "blank-name"
+    d.mkdir()
+    (d / "SKILL.md").write_text('---\nname: "  "\ndescription: y\n---\nbody')
+    with pytest.raises(ValueError):
+        load_skill(d)
 
 
 # ── doc arm (with a fake client) ────────────────────────────────────────
@@ -159,3 +187,8 @@ def test_create_treatment_missing_arg():
 def test_create_treatments_rejects_duplicate_names():
     with pytest.raises(ValueError):
         create_treatments(["baseline", "baseline"])
+
+
+def test_create_treatment_empty_mcp_ref():
+    with pytest.raises(ValueError):
+        create_treatment("mcp:")

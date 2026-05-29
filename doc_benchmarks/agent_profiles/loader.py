@@ -65,6 +65,8 @@ def load_agent_profile(path) -> AgentProfile:
         )
 
     pid = str(meta.get("id") or p.stem).strip()
+    if not pid:
+        raise ValueError(f"Agent profile '{p}' has an empty 'id' after normalization.")
     return AgentProfile(
         id=pid,
         name=str(meta.get("name") or pid).strip(),
