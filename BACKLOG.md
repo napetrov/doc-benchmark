@@ -4,6 +4,31 @@
 
 ---
 
+### #57 — Productization hardening (external-review response)
+**Scope:** Repo hygiene / contracts / packaging / CI
+**Status:** PLANNED
+
+Sequenced response to an external code-review. Full evaluation (claim-by-claim
+verification + prioritized plan) in
+[docs/decisions/2026-05-29-external-feedback-assessment.md](docs/decisions/2026-05-29-external-feedback-assessment.md).
+
+- **P0 (trust & contracts):** decide license posture + add `LICENSE`/`SECURITY.md`/
+  `CONTRIBUTING.md`; runtime `jsonschema` validation in `_load_spec()` against
+  `benchmarks/spec.schema.json`; enforce `golden_manifest` include/exclude/min/max
+  in the runner (today `run.py` calls `discover_markdown(root/"docs")` directly);
+  sandbox `example_runner.py` (no host execution by default); fix LangChain-era
+  quickstart troubleshooting + replace the stale PR template.
+- **P1 (packaging & reproducibility):** `pyproject.toml` + console entrypoint +
+  extras; pin/lock deps; output schemas + `schema_version` for
+  questions/answers/eval/arms; `run_manifest.json`; CI lint/type/schema + py
+  matrix + install/CLI smoke jobs.
+- **P2 (structure & breadth):** split the 1,706-line `cli.py` into subcommand
+  modules; unify `libraries.yaml` + `config/products.yaml`; HF Datasets artifact
+  export; deepen the (already-integrated) Ragas metrics; optional Docling
+  ingestion for PDF/Office/scans; CODEOWNERS subsystem boundaries.
+
+---
+
 ### #56 — Evaluate MCP docs, skills, and agent persona prompts
 **Scope:** Evaluation architecture
 **Status:** IN PROGRESS
