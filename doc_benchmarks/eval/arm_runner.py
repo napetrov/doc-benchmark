@@ -50,6 +50,7 @@ class ArmRunner:
         model: str = "gpt-4o-mini",
         provider: str = "openai",
         api_key: Optional[str] = None,
+        max_iterations: int = 6,
     ):
         if not treatments:
             raise ValueError("ArmRunner requires at least one treatment arm")
@@ -57,6 +58,7 @@ class ArmRunner:
         self.model = model
         self.provider = provider
         self.api_key = api_key
+        self.max_iterations = max_iterations
 
     @property
     def arm_names(self) -> List[str]:
@@ -130,6 +132,9 @@ class ArmRunner:
             logger.exception("Arm %s prepare() failed", treatment.name)
             return {"error": f"prepare_failed: {exc}", "answer": None}
 
+        if cfg.is_agentic:
+            return self._answer_agentic_arm(cfg, question_text, t0)
+
         if cfg.has_context:
             context = "\n\n---\n\n".join(c["content"] for c in cfg.injected_context)
             prompt = ANSWER_PROMPT_WITH_CONTEXT.format(
@@ -164,6 +169,42 @@ class ArmRunner:
                 for c in cfg.injected_context
             ],
             "token_usage": usage,
+            "metadata": cfg.metadata,
+            "elapsed_sec": round(time.time() - t0, 2),
+        }
+
+    def _answer_agentic_arm(
+        self, cfg, question_text: str, t0: float
+    ) -> Dict[str, Any]:
+        """Run an arm whose treatment offers tools via the agent loop."""
+        from doc_benchmarks.eval.agent_runner import run_agent_loop
+
+        try:
+            result = run_agent_loop(
+                question=question_text,
+                tools=cfg.tools,
+                model=self.model,
+                provider=self.provider,
+                system_prompt=cfg.system_prompt,
+                api_key=self.api_key,
+                max_iterations=self.max_iterations,
+            )
+        except Exception as exc:
+            logger.exception("Agentic arm failed")
+            return {"error": f"agent_failed: {exc}", "answer": None,
+                    "metadata": cfg.metadata}
+
+        return {
+            "answer": result["answer"],
+            "model": self.model,
+            "agentic": True,
+            "used_system_prompt": bool(cfg.system_prompt),
+            "context_chunks": [],
+            "transcript": result["transcript"],
+            "tool_call_count": result["tool_call_count"],
+            "iterations": result["iterations"],
+            "stopped_reason": result["stopped_reason"],
+            "token_usage": result["token_usage"],
             "metadata": cfg.metadata,
             "elapsed_sec": round(time.time() - t0, 2),
         }

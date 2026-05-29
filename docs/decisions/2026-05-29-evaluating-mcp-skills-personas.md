@@ -1,10 +1,11 @@
 # Architecture assessment: evaluating MCP docs, skills, and agent persona prompts
 
-**Status:** Partially implemented. The treatment-arm framework and arms 1, 2,
-and 4-as-context have landed (`doc_benchmarks/treatments/`, the `mcp:` doc
-source, `doc_benchmarks/eval/arm_runner.py`, and `python cli.py arms run`). The
-agentic loop (Phase 3) and faithful skill-execution-on-tasks (rest of Phase 4)
-remain open — see §8 and BACKLOG #56. The how-to lives in
+**Status:** Largely implemented. The treatment-arm framework, all three
+scenarios (injection + agentic), and the in-process agent tool-calling loop have
+landed (`doc_benchmarks/treatments/`, the `mcp:` doc source,
+`doc_benchmarks/eval/{arm_runner,agent_runner}.py`, and `python cli.py arms
+run`). Only faithful skill *script execution* on the terminal-bench track
+remains (rest of Phase 4) — see §8 and BACKLOG #56. The how-to lives in
 [../evaluating-treatments.md](../evaluating-treatments.md).
 
 **Date:** 2026-05-29
@@ -231,11 +232,15 @@ system prompt and reserve `persona` for the existing synthetic-user concept.
 - **Phase 2 — DONE (injection).** MCP doc — real MCP-protocol retrieval client
   (`mcp/mcp_protocol.py`) behind `factory.py` as `mcp:<ref>`, injected sub-arm.
   The `mcp` SDK is an optional dependency. Agentic MCP use is still Phase 3.
-- **Phase 3 — OPEN.** Agent loop (§4.3), reusing terminal-bench isolation;
-  unlocks agentic MCP and skill execution.
-- **Phase 4 — PARTIAL.** Skills: `skills/` fixtures + `SKILL.md` loader and the
-  skill-as-context arm (`SkillTreatment`) are done. Skill-execution tasks on the
-  terminal-bench track remain (depends on Phase 3).
+- **Phase 3 — DONE (in-process).** Tool-calling agent loop
+  (`eval/agent_runner.py`) with read-only tools: `agent[:source]` (doc search)
+  and `skill-agent:<path>` (progressive disclosure). The report records tool-use
+  rate. Sandboxed *script* execution stays on the terminal-bench track (§4.3,
+  Phase 4).
+- **Phase 4 — PARTIAL.** Skills: `skills/` fixtures + `SKILL.md` loader, the
+  skill-as-context arm (`SkillTreatment`), and the agentic skill-view arm
+  (`SkillAgentTreatment`) are done. Faithful skill *script execution* on the
+  terminal-bench track remains.
 
 Each phase is independently shippable and leaves the existing two-arm
 doc-validation flow working.
@@ -246,6 +251,9 @@ doc-validation flow working.
   `baseline` / `docs` / `mcp_doc` / `profile` / `skill` arms + factory.
 - `doc_benchmarks/eval/arm_runner.py` — N-arm answer generation and judging,
   reusing the existing `Judge` (via a new public `Judge.score_answer`).
+- `doc_benchmarks/eval/agent_runner.py` — bounded tool-calling loop;
+  `treatments/tools.py` (`DocQueryTool`, `ViewSkillTool`) and the
+  `MCPAgentTreatment` / `SkillAgentTreatment` arms; `chat_completion` in `llm.py`.
 - `doc_benchmarks/mcp/mcp_protocol.py` + `mcp:` in the doc-source factory.
 - `doc_benchmarks/skills/` and `doc_benchmarks/agent_profiles/` loaders, plus
   `parse_frontmatter` in `utils.py`.

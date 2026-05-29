@@ -23,10 +23,13 @@ Phases:
   `cli.py arms run` + report (the treatment-arm framework).
 - **DONE** Phase 2 (injection) — MCP doc: `mcp/mcp_protocol.py` MCP-protocol
   client behind `factory.py` (`mcp:<ref>`), injected sub-arm. `mcp` SDK optional.
-- **OPEN** Phase 3 — minimal agent (tool-calling) loop, reusing terminal-bench
-  Docker isolation; unlocks agentic MCP use and skill execution.
-- **PARTIAL** Phase 4 — skills: `SKILL.md` loader + skill-as-context arm done;
-  skill-execution tasks on the terminal-bench track remain (needs Phase 3).
+- **DONE** Phase 3 (in-process) — tool-calling agent loop
+  (`eval/agent_runner.py`) with read-only tools: `agent[:source]` (doc search)
+  and `skill-agent:<path>` (progressive disclosure); report records tool-use rate.
+- **PARTIAL** Phase 4 — skills: `SKILL.md` loader, skill-as-context
+  (`skill:`), and agentic skill-view (`skill-agent:`) arms done. Remaining:
+  faithful skill *script execution*, which needs terminal-bench Docker
+  isolation (the in-process loop is intentionally read-only).
 
 Naming discipline (applied): `agent_profile`/`profile:` is the answerer's
 system prompt; `persona` stays the synthetic-user concept.

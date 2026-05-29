@@ -7,6 +7,8 @@ from .base import Treatment
 from .arms import (
     BaselineTreatment,
     DocTreatment,
+    MCPAgentTreatment,
+    SkillAgentTreatment,
     AgentProfileTreatment,
     SkillTreatment,
 )
@@ -37,6 +39,12 @@ def create_treatment(
         Agent persona prompt loaded from a Markdown file.
     ``skill:<path>``
         Agent skill loaded from a ``SKILL.md`` file or directory.
+    ``agent:<doc-source>``
+        Agentic doc use — the model is given a documentation-search tool over
+        ``<doc-source>`` and decides when to call it (defaults to ``context7``).
+    ``skill-agent:<path>``
+        Agentic skill use — the model is offered the skill via progressive
+        disclosure and decides whether to load it.
 
     Raises:
         ValueError: If the spec is unrecognised or missing an argument.
@@ -45,6 +53,20 @@ def create_treatment(
 
     if spec == "baseline":
         return BaselineTreatment()
+
+    # NOTE: check 'skill-agent:' before 'skill:' / 'agent:' prefix tests.
+    if spec.startswith("skill-agent:"):
+        from doc_benchmarks.skills import load_skill
+        path = spec[len("skill-agent:"):]
+        if not path:
+            raise ValueError("'skill-agent:' arm requires a path, e.g. 'skill-agent:skills/onetbb-quickstart'")
+        return SkillAgentTreatment(load_skill(path))
+
+    if spec == "agent" or spec.startswith("agent:"):
+        from doc_benchmarks.mcp.factory import create_doc_source_client
+        doc_source = spec[len("agent:"):] if spec.startswith("agent:") else "context7"
+        client = create_doc_source_client(doc_source or "context7", cache_dir=cache_dir)
+        return MCPAgentTreatment(client, name="agent", max_results=top_k)
 
     if spec == "docs" or spec.startswith("docs:"):
         from doc_benchmarks.mcp.factory import create_doc_source_client

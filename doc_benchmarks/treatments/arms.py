@@ -93,6 +93,69 @@ class DocTreatment(Treatment):
         return AgentConfig(injected_context=reranked[: self.keep], metadata=metadata)
 
 
+class MCPAgentTreatment(Treatment):
+    """Agentic MCP doc use — offer a doc-search tool; the model decides to call it.
+
+    This is the faithful test of whether a doc source is *usable by an agent*,
+    not just whether its text is relevant: the model must choose good queries
+    and integrate the results. Contrast with :class:`DocTreatment`, which
+    pre-injects retrieved chunks.
+    """
+
+    def __init__(
+        self,
+        mcp_client,
+        name: str = "mcp_agent",
+        max_results: int = 5,
+        keep: int = 3,
+        arm_kind: str = "mcp_agent",
+    ):
+        self.name = name
+        self.mcp_client = mcp_client
+        self.max_results = max_results
+        self.keep = keep
+        self.arm_kind = arm_kind
+
+    def prepare(self, question_text, library_name, library_id=None) -> AgentConfig:
+        from .tools import DocQueryTool
+
+        lib_id = library_id or library_name
+        tool = DocQueryTool(
+            self.mcp_client, lib_id, max_results=self.max_results, keep=self.keep
+        )
+        return AgentConfig(
+            tools=[tool],
+            metadata={"arm_kind": self.arm_kind, "library_id": lib_id},
+        )
+
+
+class SkillAgentTreatment(Treatment):
+    """Agentic skill use — offer the skill via progressive disclosure.
+
+    The model sees only the skill's name + one-line description (in the tool
+    schema) and must *decide* to load the full instructions, mirroring how
+    skills are actually consumed. Running the skill's bundled scripts needs a
+    sandbox and stays on the terminal-bench task track.
+    """
+
+    def __init__(self, skill: Skill, name: Optional[str] = None, max_chars: int = 12_000):
+        self.skill = skill
+        self.max_chars = max_chars
+        self.name = name or f"skill_agent:{skill.name}"
+
+    def prepare(self, question_text, library_name, library_id=None) -> AgentConfig:
+        from .tools import ViewSkillTool
+
+        return AgentConfig(
+            tools=[ViewSkillTool(self.skill, self.max_chars)],
+            metadata={
+                "arm_kind": "skill_agent",
+                "skill_name": self.skill.name,
+                "skill_path": str(self.skill.path),
+            },
+        )
+
+
 class AgentProfileTreatment(Treatment):
     """Agent persona prompt — swaps the answering agent's system prompt."""
 

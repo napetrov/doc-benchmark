@@ -41,6 +41,27 @@ def render_arms_report(data: Dict[str, Any]) -> str:
         lines.append("_No evaluations available (answers were not judged)._")
         lines.append("")
 
+    # Agentic-usage summary: how often each agentic arm actually used its tools.
+    answers = data.get("answers", [])
+    agentic_stats: Dict[str, Dict[str, Any]] = {}
+    for rec in answers:
+        for arm_name, arm in rec.get("arms", {}).items():
+            if isinstance(arm, dict) and arm.get("agentic"):
+                s = agentic_stats.setdefault(arm_name, {"calls": [], "iters": []})
+                s["calls"].append(arm.get("tool_call_count", 0))
+                s["iters"].append(arm.get("iterations", 0))
+    if agentic_stats:
+        lines.append("## Agentic tool use")
+        lines.append("")
+        lines.append("| Arm | Avg tool calls | Avg iterations | n |")
+        lines.append("| --- | ---: | ---: | ---: |")
+        for arm_name, s in agentic_stats.items():
+            n = len(s["calls"]) or 1
+            avg_calls = sum(s["calls"]) / n
+            avg_iters = sum(s["iters"]) / n
+            lines.append(f"| `{arm_name}` | {avg_calls:.1f} | {avg_iters:.1f} | {len(s['calls'])} |")
+        lines.append("")
+
     evaluations = data.get("evaluations")
     if evaluations:
         lines.append("## Per-question scores")

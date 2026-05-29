@@ -1358,6 +1358,8 @@ def build_parser() -> argparse.ArgumentParser:
     arms_run_p.add_argument("--top-k", type=positive_int, default=5, dest="top_k",
                             help="Docs to retrieve before reranking, for doc/MCP arms (default: 5)")
     arms_run_p.add_argument("--rerank-threshold", type=float, default=0.3, dest="rerank_threshold")
+    arms_run_p.add_argument("--max-iterations", type=positive_int, default=6, dest="max_iterations",
+                            help="Max tool-call rounds for agentic arms (agent:/skill-agent:, default: 6)")
     arms_run_p.add_argument("--concurrency", type=positive_int, default=5)
     arms_run_p.add_argument("--out-json", default=None, dest="out_json",
                             help="Output JSON path (default: results/arms/{product}.json)")
@@ -1404,7 +1406,8 @@ def cmd_arms_run(args: argparse.Namespace) -> None:
                     library_id = args.product
                 break
 
-    runner = ArmRunner(treatments, model=args.model, provider=args.provider)
+    runner = ArmRunner(treatments, model=args.model, provider=args.provider,
+                       max_iterations=args.max_iterations)
     records = runner.run(
         library_name=args.product,
         questions=questions,
