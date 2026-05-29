@@ -1,8 +1,11 @@
 # Architecture assessment: evaluating MCP docs, skills, and agent persona prompts
 
-**Status:** Assessment / proposal — not yet implemented. Captures the state of
-the codebase on 2026-05-29 and a proposed extension path. Supersedes nothing;
-intended to seed the implementation backlog.
+**Status:** Partially implemented. The treatment-arm framework and arms 1, 2,
+and 4-as-context have landed (`doc_benchmarks/treatments/`, the `mcp:` doc
+source, `doc_benchmarks/eval/arm_runner.py`, and `python cli.py arms run`). The
+agentic loop (Phase 3) and faithful skill-execution-on-tasks (rest of Phase 4)
+remain open — see §8 and BACKLOG #56. The how-to lives in
+[../evaluating-treatments.md](../evaluating-treatments.md).
 
 **Date:** 2026-05-29
 
@@ -223,15 +226,30 @@ system prompt and reserve `persona` for the existing synthetic-user concept.
 
 ## 8. Suggested phasing
 
-- **Phase 1 (low risk, high reuse):** agent persona prompts. Parameterize the
-  answerer system prompt; add `agent_profiles/` fixtures; N-arm report. Proves
-  the treatment-arm generalization on the cheapest case.
-- **Phase 2:** MCP doc — real MCP-protocol retrieval client behind
-  `factory.py`, injected sub-arm only. No agent loop yet.
-- **Phase 3:** agent loop (§4.3), reusing terminal-bench isolation; unlocks
-  agentic MCP and skill execution.
-- **Phase 4:** skills as first-class — `skills/` fixtures, skill-as-context arm,
-  and skill-execution tasks on the terminal-bench track.
+- **Phase 1 — DONE.** Agent persona prompts. `system` support in `llm.py`,
+  `agent_profiles/` fixtures + loader, `AgentProfileTreatment`, N-arm report.
+- **Phase 2 — DONE (injection).** MCP doc — real MCP-protocol retrieval client
+  (`mcp/mcp_protocol.py`) behind `factory.py` as `mcp:<ref>`, injected sub-arm.
+  The `mcp` SDK is an optional dependency. Agentic MCP use is still Phase 3.
+- **Phase 3 — OPEN.** Agent loop (§4.3), reusing terminal-bench isolation;
+  unlocks agentic MCP and skill execution.
+- **Phase 4 — PARTIAL.** Skills: `skills/` fixtures + `SKILL.md` loader and the
+  skill-as-context arm (`SkillTreatment`) are done. Skill-execution tasks on the
+  terminal-bench track remain (depends on Phase 3).
 
 Each phase is independently shippable and leaves the existing two-arm
 doc-validation flow working.
+
+## 9. What landed in the first implementation pass
+
+- `doc_benchmarks/treatments/` — `Treatment`/`AgentConfig` abstraction and the
+  `baseline` / `docs` / `mcp_doc` / `profile` / `skill` arms + factory.
+- `doc_benchmarks/eval/arm_runner.py` — N-arm answer generation and judging,
+  reusing the existing `Judge` (via a new public `Judge.score_answer`).
+- `doc_benchmarks/mcp/mcp_protocol.py` + `mcp:` in the doc-source factory.
+- `doc_benchmarks/skills/` and `doc_benchmarks/agent_profiles/` loaders, plus
+  `parse_frontmatter` in `utils.py`.
+- `doc_benchmarks/report/arms_report.py` and `python cli.py arms run`.
+- Seed fixtures: `agent_profiles/concise_expert.md`,
+  `skills/onetbb-quickstart/SKILL.md`. The existing two-arm `with_docs`/
+  `without_docs` pipeline is untouched.

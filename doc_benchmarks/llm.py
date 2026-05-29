@@ -105,6 +105,7 @@ def llm_call(
     api_key: Optional[str] = None,
     max_retries: int = 3,
     retry_delay: float = 2.0,
+    system: Optional[str] = None,
 ) -> str:
     """Call any LLM via litellm with automatic retry on transient errors.
 
@@ -115,6 +116,8 @@ def llm_call(
         api_key: Optional API key (falls back to env var).
         max_retries: Max retry attempts on transient errors (default 3).
         retry_delay: Initial delay in seconds; doubles each attempt (exponential backoff).
+        system: Optional system prompt. When provided it is sent as a leading
+            ``system`` message — used to vary the answering agent's persona.
 
     Returns:
         Model response as a plain string.
@@ -122,6 +125,7 @@ def llm_call(
     text, _ = llm_call_with_usage(
         prompt=prompt, model=model, provider=provider,
         api_key=api_key, max_retries=max_retries, retry_delay=retry_delay,
+        system=system,
     )
     return text
 
@@ -133,11 +137,15 @@ def llm_call_with_usage(
     api_key: Optional[str] = None,
     max_retries: int = 3,
     retry_delay: float = 2.0,
+    system: Optional[str] = None,
 ) -> "tuple[str, dict]":
     """Like llm_call, but returns (text, usage_dict).
 
     usage_dict keys: prompt_tokens, completion_tokens, total_tokens.
     All values default to 0 if the provider doesn't return usage.
+
+    Args:
+        system: Optional system prompt sent as a leading ``system`` message.
 
     Returns:
         (response_text: str, usage: dict)
@@ -147,6 +155,11 @@ def llm_call_with_usage(
     api_key = _resolve_api_key(provider, api_key)
     litellm_model = _build_litellm_model(model, provider)
 
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
     last_exc: Optional[Exception] = None
     delay = retry_delay
 
@@ -154,7 +167,7 @@ def llm_call_with_usage(
         try:
             resp = completion(
                 model=litellm_model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 api_key=api_key or None,
             )
             text = resp.choices[0].message.content

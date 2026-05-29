@@ -9,7 +9,10 @@ CLI surface. The files in this directory go deeper:
   personas → questions → answers → judge → report. Includes troubleshooting
   and a cost estimate.
 - [adding-doc-source.md](adding-doc-source.md) — point the pipeline at local
-  files, a single URL, or a custom MCP-style client.
+  files, a single URL, a real MCP server, or a custom client.
+- [evaluating-treatments.md](evaluating-treatments.md) — compare
+  context-augmentation arms (docs, MCP, skills, agent persona prompts) with
+  `cli.py arms run`.
 
 ## Extending doc-benchmark
 
