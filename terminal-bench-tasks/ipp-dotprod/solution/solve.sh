@@ -2,13 +2,15 @@
 set -euo pipefail
 
 cat > /app/ipp_dot.c <<'CPP'
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ipp.h>
 
 int main(int argc, char **argv) {
     long n = argc > 1 ? atol(argv[1]) : 4000000;
-    if (n < 1) {
+    /* IPP lengths are int; reject anything that would truncate on the cast. */
+    if (n < 1 || n > INT_MAX) {
         fprintf(stderr, "INVALID_ARGUMENTS\n");
         return 2;
     }

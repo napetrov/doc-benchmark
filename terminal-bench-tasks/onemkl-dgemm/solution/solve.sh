@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cat > /app/dgemm_mkl.c <<'CPP'
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "mkl.h"
@@ -12,6 +13,12 @@ static double bv(int i, int j) { return (double)(((i * 5 + j * 11) % 17) - 8); }
 int main(int argc, char **argv) {
     int N = argc > 1 ? atoi(argv[1]) : 640;
     if (N < 1) {
+        fprintf(stderr, "INVALID_ARGUMENTS\n");
+        return 2;
+    }
+    /* Reject sizes where N*N*sizeof(double) would overflow size_t. */
+    size_t n = (size_t)N;
+    if (n > SIZE_MAX / n || n * n > SIZE_MAX / sizeof(double)) {
         fprintf(stderr, "INVALID_ARGUMENTS\n");
         return 2;
     }

@@ -10,7 +10,7 @@ BINARY = Path("/app/dpl_reduce")
 SERIAL = Path("/app/reduce_serial")
 TARGET_SOURCE = Path("/app/dpl_reduce.cpp")
 ARGS = ["4000000"]
-KEYWORDS = ["oneapi/dpl", "transform_reduce", "execution::par"]
+KEYWORDS = ["oneapi/dpl", "transform_reduce", "par_unseq"]
 TIMEOUT_SEC = 10.0
 
 

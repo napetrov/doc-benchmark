@@ -32,6 +32,7 @@ def test_binary_exists():
     assert BINARY.exists(), f"{BINARY} not found; compile the oneMKL FFT binary"
     assert os.access(BINARY, os.X_OK), f"{BINARY} is not executable"
     assert SERIAL.exists(), f"{SERIAL} not found; serial reference binary is required"
+    assert os.access(SERIAL, os.X_OK), f"{SERIAL} is not executable"
 
 
 def test_matches_serial_reference():

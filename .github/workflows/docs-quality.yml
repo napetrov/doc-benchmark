@@ -83,6 +83,10 @@ jobs:
   terminal-bench-verify-oneapi:
     name: Verify oneAPI task
     runs-on: ubuntu-latest
+    # Verify-only job: it just checks out the repo and builds/runs containers,
+    # so restrict the token to read access.
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -94,6 +98,8 @@ jobs:
           - ipp-dotprod
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Free disk space
         run: |

@@ -1,10 +1,22 @@
 /* Serial reference: dot product over two deterministic integer-valued vectors. */
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-    long n = argc > 1 ? atol(argv[1]) : 4000000;
-    if (n < 1) {
+    long n = 4000000;
+    if (argc > 1) {
+        char *end = NULL;
+        errno = 0;
+        n = strtol(argv[1], &end, 10);
+        if (errno != 0 || end == argv[1] || *end != '\0') {
+            fprintf(stderr, "INVALID_ARGUMENTS\n");
+            return 2;
+        }
+    }
+    /* Upper bound keeps the (int)n cast in the IPP variant well-defined. */
+    if (n < 1 || n > INT_MAX) {
         fprintf(stderr, "INVALID_ARGUMENTS\n");
         return 2;
     }
