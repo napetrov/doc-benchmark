@@ -97,6 +97,7 @@ def cmd_questions_refine(args: argparse.Namespace) -> None:
         out = Path(args.output) if args.output else Path(f"questions/{args.product}_refined.json")
         out.parent.mkdir(parents=True, exist_ok=True)
         payload = {
+            "schema_version": "questions.v1",
             "library": args.product,
             "total": len(report.questions),
             "difficulty_distribution": report.difficulty_after,

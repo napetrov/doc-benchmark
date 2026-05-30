@@ -12,6 +12,7 @@ from doc_benchmarks.metrics import coverage, freshness_lite, readability
 from doc_benchmarks.metrics.example_runner import ExampleResult, ExecutionPolicy, score_examples
 from doc_benchmarks.gate.soft_gate import check_soft_gate
 from doc_benchmarks.runner.spec import load_spec, select_docs
+from doc_benchmarks.runner.manifest import build_run_manifest
 
 
 @dataclass
@@ -149,6 +150,7 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
                 "min_score": gate_result.min_score,
             }
         },
+        "run_manifest": build_run_manifest(spec_path=spec_path, doc_paths=docs),
     }
 
 
