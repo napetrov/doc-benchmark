@@ -43,6 +43,8 @@ jobs:
       - run: pip install PyYAML jsonschema
       - name: schema-check
         run: python -m doc_benchmarks.schema_check benchmarks/spec.v1.yaml
+      - name: registry-drift-check
+        run: python -m doc_benchmarks.config_check
 
   test:
     name: Tests (py${{ matrix.python-version }})
