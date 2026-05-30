@@ -6,13 +6,12 @@ import json
 from dataclasses import dataclass, asdict, fields
 from pathlib import Path
 
-import yaml
-
 from doc_benchmarks.ingest.chunker import chunk_text
 from doc_benchmarks.ingest.loader import discover_markdown, load_docs
 from doc_benchmarks.metrics import coverage, freshness_lite, readability
-from doc_benchmarks.metrics.example_runner import ExampleResult, score_examples
+from doc_benchmarks.metrics.example_runner import ExampleResult, ExecutionPolicy, score_examples
 from doc_benchmarks.gate.soft_gate import check_soft_gate
+from doc_benchmarks.runner.spec import load_spec, select_docs
 
 
 @dataclass
@@ -38,19 +37,13 @@ def _weighted_score(doc: dict, weights: dict[str, float], active_metrics: list[s
 
 
 def _load_spec(spec_path: Path) -> dict:
-    """Load benchmark spec YAML with explicit, descriptive failures."""
-    try:
-        content = spec_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise RuntimeError(f"Failed to read spec file: {spec_path}: {exc}") from exc
+    """Load a benchmark spec YAML with explicit, descriptive failures.
 
-    try:
-        data = yaml.safe_load(content)
-    except yaml.YAMLError as exc:
-        raise RuntimeError(f"Invalid YAML in spec file: {spec_path}: {exc}") from exc
-
-    if not isinstance(data, dict):
-        raise RuntimeError(f"Spec root must be a mapping/object: {spec_path}")
+    Full v1 specs (those declaring ``version``/``golden_manifest``) are
+    validated against ``benchmarks/spec.schema.json``. Minimal/legacy specs
+    skip schema validation but still get the lightweight presence checks below.
+    """
+    data = load_spec(spec_path)
 
     missing: list[str] = []
     if "weights" not in data:
@@ -76,13 +69,18 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
     weights = spec["weights"]
     example_cfg = spec["metrics"].get("example_pass_rate", {})
     example_enabled = bool(example_cfg.get("enabled", False))
-    example_timeout = int(example_cfg.get("timeout", 5))
+    example_policy = ExecutionPolicy.from_config(example_cfg)
 
     active_metrics = ["coverage", "freshness_lite", "readability"]
     if example_enabled:
         active_metrics.append("example_pass_rate")
 
-    docs = discover_markdown(root / "docs")
+    manifest = spec.get("golden_manifest")
+    if manifest:
+        docs = select_docs(root, manifest)
+    else:
+        # Legacy/minimal specs without a manifest: discover all markdown under docs/.
+        docs = discover_markdown(root / "docs")
     loaded = load_docs(docs)
 
     # Collect per-doc metrics and cached example results
@@ -100,7 +98,7 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
         }
 
         if example_enabled:
-            ex_score, ex_results = score_examples(p, timeout=example_timeout)
+            ex_score, ex_results = score_examples(p, example_policy)
             row["example_pass_rate"] = ex_score
             cached_example_results.append(ex_results)
         else:
@@ -133,7 +131,8 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
         }
         if example_enabled:
             d["example_results"] = [
-                {"index": r.index, "lang": r.lang, "passed": r.passed, "error": r.error}
+                {"index": r.index, "lang": r.lang, "passed": r.passed,
+                 "status": r.status, "error": r.error}
                 for r in ex_results
             ]
         docs_out.append(d)
