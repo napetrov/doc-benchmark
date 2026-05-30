@@ -203,6 +203,31 @@ def cmd_eval_ragas(args: argparse.Namespace) -> None:
     _run_ragas_eval(answers, output_path, _Args())
 
 
+def cmd_eval_grounding(args: argparse.Namespace) -> None:
+    """Compute reference-free grounding/citation metrics (no LLM calls)."""
+    import json
+    from pathlib import Path
+
+    from doc_benchmarks.eval.grounding import evaluate_grounding
+
+    data = json.loads(Path(args.answers).read_text())
+    answers = data.get("answers", data) if isinstance(data, dict) else data
+    result = evaluate_grounding(answers, threshold=args.threshold)
+
+    summary = result["summary"]
+    gs = summary["grounding_score"]
+    print(f"Grounding over {summary['n_evaluated']} with-docs answers:")
+    if gs["mean"] is not None:
+        print(f"  grounding_score : {gs['mean']:.3f}  (95% CI {gs['lo']:.3f}–{gs['hi']:.3f})")
+    print(f"  citation_rate   : {summary['citation_rate']:.3f}  (threshold {summary['threshold']})")
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(result, indent=2))
+        print(f"\n✅ Grounding report saved to {out}")
+
+
 def register(sub, positive_int) -> None:
     """Add the `eval` subcommand group."""
     # Eval subcommand group
@@ -229,6 +254,16 @@ def register(sub, positive_int) -> None:
     ragas_p.add_argument("--ragas-provider", default="openai", choices=["openai", "anthropic"],
                          help="Provider for RAGAS judge LLM (default: openai)")
     ragas_p.set_defaults(func=cmd_eval_ragas)
+
+    # eval grounding (reference-free, no LLM)
+    grounding_p = eval_sub.add_parser(
+        "grounding", help="Reference-free grounding/citation metrics with confidence intervals"
+    )
+    grounding_p.add_argument("--answers", required=True, help="Path to answers JSON file")
+    grounding_p.add_argument("--output", default=None, help="Output JSON report path")
+    grounding_p.add_argument("--threshold", type=float, default=0.5,
+                             help="Grounding score above which an answer counts as grounded (default: 0.5)")
+    grounding_p.set_defaults(func=cmd_eval_grounding)
 
     # eval panel-score
     panel_p = eval_sub.add_parser("panel-score", help="Score answers using a multi-judge panel")
