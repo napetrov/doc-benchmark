@@ -6,26 +6,32 @@
 
 ### #57 — Productization hardening (external-review response)
 **Scope:** Repo hygiene / contracts / packaging / CI
-**Status:** PLANNED
+**Status:** DONE (P0–P2 landed)
 
 Sequenced response to an external code-review. Full evaluation (claim-by-claim
 verification + prioritized plan) in
 [docs/decisions/2026-05-29-external-feedback-assessment.md](docs/decisions/2026-05-29-external-feedback-assessment.md).
 
-- **P0 (trust & contracts):** decide license posture + add `LICENSE`/`SECURITY.md`/
-  `CONTRIBUTING.md`; runtime `jsonschema` validation in `_load_spec()` against
-  `benchmarks/spec.schema.json`; enforce `golden_manifest` include/exclude/min/max
-  in the runner (today `run.py` calls `discover_markdown(root/"docs")` directly);
-  sandbox `example_runner.py` (no host execution by default); fix LangChain-era
-  quickstart troubleshooting + replace the stale PR template.
-- **P1 (packaging & reproducibility):** `pyproject.toml` + console entrypoint +
-  extras; pin/lock deps; output schemas + `schema_version` for
-  questions/answers/eval/arms; `run_manifest.json`; CI lint/type/schema + py
-  matrix + install/CLI smoke jobs.
-- **P2 (structure & breadth):** split the 1,706-line `cli.py` into subcommand
-  modules; unify `libraries.yaml` + `config/products.yaml`; HF Datasets artifact
-  export; deepen the (already-integrated) Ragas metrics; optional Docling
-  ingestion for PDF/Office/scans; CODEOWNERS subsystem boundaries.
+- **P0 (trust & contracts) — DONE:** Apache-2.0 `LICENSE` + `NOTICE`,
+  `SECURITY.md`, `CONTRIBUTING.md`, generic PR + issue templates; runtime
+  `jsonschema` validation (`doc_benchmarks/runner/spec.py`, `schema_check`);
+  `golden_manifest` include/exclude/min/max enforced in the runner; sandboxed
+  example execution (`ExecutionPolicy`, default `backend=none`); LangChain-era
+  quickstart fixed.
+- **P1 (packaging & reproducibility) — DONE:** `pyproject.toml` + `doc-benchmark`
+  entry point + extras; `requirements.lock.txt`; versioned artifact schemas +
+  `schema_version` (`doc_benchmarks/artifacts.py`); `run_manifest`
+  (`doc_benchmarks/runner/manifest.py`); CI lint/type/schema/drift + py
+  3.10–3.13 matrix + package smoke (`.github/workflows/ci.yml`).
+- **P2 (structure & breadth) — DONE:** `cli.py` split into `doc_benchmarks.cli`
+  + `commands/`; product-registry drift detection (`config_check`); HF Datasets/
+  JSONL/Parquet export (`dataset export`); deepened eval (grounding/citation
+  metrics + bootstrap CIs, `eval grounding`); optional Docling ingestion
+  (`ingest docling`); `CODEOWNERS`.
+
+Follow-ups (deliberately deferred): broaden ruff (style/UP) and mypy coverage
+across legacy modules; merge the two config files fully (currently
+drift-checked); HF Hub publishing of exported datasets.
 
 ---
 
