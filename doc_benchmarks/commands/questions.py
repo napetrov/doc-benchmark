@@ -158,7 +158,6 @@ def cmd_questions_analyze(args: argparse.Namespace) -> None:
 
 def cmd_questions_generate(args: argparse.Namespace) -> None:
     """Generate questions from personas and seed topics."""
-    import os
     import yaml
     from doc_benchmarks.questions import RagasSeedExtractor, QuestionGenerator, QuestionValidator
 
@@ -169,7 +168,7 @@ def cmd_questions_generate(args: argparse.Namespace) -> None:
     else:
         config = {}
 
-    product_config = config.get("products", {}).get(args.product, {})
+    _product_config = config.get("products", {}).get(args.product, {})
     _retrieval_cfg = config.get("retrieval", {})
     if args.top_k is None:
         args.top_k = _retrieval_cfg.get("top_k", 3)
@@ -229,7 +228,7 @@ def cmd_questions_generate(args: argparse.Namespace) -> None:
 
         questions, stats = validator.validate_and_dedupe(args.product, questions)
 
-        print(f"✓ Validation complete:")
+        print("✓ Validation complete:")
         print(f"  Initial: {stats['initial_count']}")
         print(f"  After validation: {stats['after_validation']}")
         print(f"  After deduplication: {stats['after_deduplication']}")

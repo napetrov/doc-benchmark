@@ -70,16 +70,28 @@ line-length = 100
 target-version = "py310"
 extend-exclude = ["terminal-bench-tasks", "benchmarks", "answers", "eval", "questions", "baselines"]
 
+# Correctness-focused gate to start (pyflakes + bugbear + syntax). Stylistic
+# modernization (import sorting, PEP 585/604 hints) is deferred to a follow-up
+# so the initial gate is enforceable without a repo-wide reformat.
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
-ignore = ["E501", "B008"]
+select = ["F", "B", "E9"]
+ignore = ["B008"]
 
+# Type checking is enforced on newly-typed modules to start; broadening
+# coverage across the legacy code is tracked as a follow-up.
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
+disable_error_code = ["import-untyped"]
 warn_unused_ignores = false
 no_implicit_optional = true
-files = ["doc_benchmarks"]
+files = [
+  "doc_benchmarks/runner/spec.py",
+  "doc_benchmarks/runner/manifest.py",
+  "doc_benchmarks/artifacts.py",
+  "doc_benchmarks/schema_check.py",
+  "doc_benchmarks/metrics/example_runner.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

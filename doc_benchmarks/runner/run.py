@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass
 from pathlib import Path
 
 from doc_benchmarks.ingest.chunker import chunk_text
@@ -120,7 +120,7 @@ def run_benchmark(root: Path, spec_path: Path) -> dict:
     total_score = round(sum(r["score"] for r in rows) / max(1, len(rows)), 4)
 
     docs_out = []
-    for row, ex_results in zip(rows, cached_example_results):
+    for row, ex_results in zip(rows, cached_example_results, strict=True):
         d = {
             "path": row["path"],
             "chunks": row["chunks"],

@@ -164,7 +164,7 @@ def cmd_baseline_compare(args: argparse.Namespace) -> None:
         print(f"{label:<20} {str(b_val):>10} {str(c_val):>10} {change:>8}")
 
     if deltas_changed:
-        print(f"\nQuestions with notable changes (|Δ| ≥ 1):")
+        print("\nQuestions with notable changes (|Δ| ≥ 1):")
         print(f"  {'ID':<20} {'base_δ':>7} {'cur_δ':>7} {'change':>7}  Question")
         print("  " + "─" * 80)
         for q_id, bd, cd, ch, txt in sorted(deltas_changed, key=lambda x: -abs(x[3])):

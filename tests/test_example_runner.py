@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 from doc_benchmarks.metrics.example_runner import (
     ExecutionPolicy,

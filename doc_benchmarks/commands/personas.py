@@ -62,7 +62,7 @@ def cmd_personas_discover(args: argparse.Namespace) -> None:
     print(f"✓ Saved to {output_path}")
     print("\nNext steps:")
     print(f"  1. Review: cat {output_path}")
-    print(f"  2. Edit if needed")
+    print("  2. Edit if needed")
     print(f"  3. Approve: python cli.py personas approve --file {output_path}")
 
 

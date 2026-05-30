@@ -29,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
         try:
             ivalue = int(value)
         except ValueError:
-            raise argparse.ArgumentTypeError(f"expected an integer, got '{value}'")
+            raise argparse.ArgumentTypeError(f"expected an integer, got '{value}'") from None
         if ivalue < 1:
             raise argparse.ArgumentTypeError(f"must be >= 1, got {value}")
         return ivalue

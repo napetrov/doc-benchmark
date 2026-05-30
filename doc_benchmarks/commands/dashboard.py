@@ -10,7 +10,7 @@ from pathlib import Path
 def cmd_dashboard_generate(args: argparse.Namespace) -> None:
     """Aggregate evaluation results and render Markdown + JSON dashboard."""
     from doc_benchmarks.dashboard.aggregator import ResultsAggregator
-    from doc_benchmarks.dashboard.markdown_renderer import render_dashboard, save_dashboard_markdown, save_dashboard_json
+    from doc_benchmarks.dashboard.markdown_renderer import render_dashboard, save_dashboard_json
 
     results_dir = Path(args.results_dir)
     output_dir = Path(args.output_dir)
