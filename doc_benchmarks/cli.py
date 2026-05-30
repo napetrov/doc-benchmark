@@ -11,6 +11,7 @@ from doc_benchmarks.commands import (
     baseline,
     benchmark,
     dashboard,
+    dataset,
     evaluate,
     library,
     orchestrate,
@@ -51,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.register(sub, positive_int)       # benchmark
     dashboard.register(sub, positive_int)       # dashboard
     arms.register(sub, positive_int)            # arms
+    dataset.register(sub, positive_int)         # dataset
 
     return p
 
