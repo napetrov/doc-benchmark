@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -51,11 +52,14 @@ def cmd_baseline_save(args: argparse.Namespace) -> None:
 
     eval_data = json.loads(eval_path.read_text())
     product = args.product or eval_data.get("product", "unknown")
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
     name = args.name or f"{product}-{timestamp}"
 
     BASELINES_DIR.mkdir(parents=True, exist_ok=True)
     dest = BASELINES_DIR / f"{name}.json"
+    if dest.exists():
+        print(f"❌ Baseline already exists: {dest} (choose a different --name)", file=sys.stderr)
+        raise SystemExit(1)
     dest.write_text(json.dumps(eval_data, indent=2))
 
     manifest = _baseline_manifest()

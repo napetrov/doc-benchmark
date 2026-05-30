@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from doc_benchmarks.commands.evaluate import _run_ragas_eval
@@ -17,10 +18,17 @@ def cmd_answers_generate(args: argparse.Namespace) -> None:
 
     # Load config
     config_path = Path("config/products.yaml")
+    config: dict = {}
     if config_path.exists():
-        config = yaml.safe_load(config_path.read_text())
-    else:
-        config = {}
+        try:
+            loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            print(f"Error: invalid YAML in {config_path}: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+        if loaded is not None and not isinstance(loaded, dict):
+            print(f"Error: expected a mapping in {config_path}", file=sys.stderr)
+            raise SystemExit(1)
+        config = loaded or {}
 
     _product_config = config.get("products", {}).get(args.product, {})
     _retrieval_cfg = config.get("retrieval", {})
@@ -29,7 +37,10 @@ def cmd_answers_generate(args: argparse.Namespace) -> None:
 
     # Load questions
     questions_data = json.loads(Path(args.questions).read_text())
-    questions = questions_data.get("questions", questions_data)  # Handle both formats
+    questions = questions_data.get("questions", questions_data) if isinstance(questions_data, dict) else questions_data
+    if not isinstance(questions, list) or not all(isinstance(q, dict) for q in questions):
+        print(f"Error: expected a list of question objects in {args.questions}", file=sys.stderr)
+        raise SystemExit(1)
     print(f"Loaded {len(questions)} questions from {args.questions}")
 
     # Setup documentation source client

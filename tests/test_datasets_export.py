@@ -66,3 +66,15 @@ def test_export_parquet(tmp_path):
                                "questions": [{"id": "q1", "text": "x"}]}))
     primary = export_artifact("questions", src, tmp_path / "out", fmt="parquet")
     assert primary.exists()
+
+
+def test_flatten_missing_record_key_raises():
+    import pytest
+    with pytest.raises(KeyError):
+        flatten("answers", {"not_answers": []})
+
+
+def test_flatten_non_list_records_raises():
+    import pytest
+    with pytest.raises(TypeError):
+        flatten("answers", {"answers": {"q": 1}})

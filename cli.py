@@ -2,15 +2,15 @@
 """CLI for doc-benchmark: thin compatibility shim.
 
 The implementation now lives in the ``doc_benchmarks`` package. This module
-keeps ``python cli.py ...`` working and re-exports the public names that were
-historically importable from ``cli``.
+keeps ``python cli.py ...`` working. Only ``main`` and ``build_parser`` are
+re-exported here; import command functions from ``doc_benchmarks.commands.*``.
 """
 
 from __future__ import annotations
 
-from doc_benchmarks.cli import main
+from doc_benchmarks.cli import build_parser, main
 
-# Re-export command functions and helpers for backward compatibility.
+__all__ = ["build_parser", "main"]
 
 if __name__ == "__main__":
     main()

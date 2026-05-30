@@ -13,6 +13,11 @@ def bootstrap_ci(
     Returns ``{"mean", "lo", "hi", "n"}``. Deterministic for a given ``seed``,
     so it is safe to use in tests and reproducible runs.
     """
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be between 0 and 1 (exclusive)")
+    if n_resamples < 1:
+        raise ValueError("n_resamples must be >= 1")
+
     vals = [float(v) for v in values if v is not None]
     n = len(vals)
     if n == 0:

@@ -35,7 +35,7 @@ Previously, fenced `python`/`bash`/`sh` blocks were executed directly on the
 host with only a timeout. That is unsafe for any documentation you do not own.
 The default is now `none`; you must explicitly opt into execution.
 
-`pass_rate` is computed over **executed** examples only. A document with no
+`example_pass_rate` is computed over **executed** examples only. A document with no
 examples — or whose examples were all skipped — scores `1.0` (nothing failed).
 Each example records a `status` of `passed` / `failed` / `skipped` / `error`.
 

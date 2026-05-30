@@ -43,7 +43,12 @@ def flatten(kind: str, data: dict) -> list[dict]:
     """
     if kind not in RECORD_KEY:
         raise KeyError(f"Unknown artifact kind: {kind!r}")
-    records = data.get(RECORD_KEY[kind], [])
+    record_key = RECORD_KEY[kind]
+    if record_key not in data:
+        raise KeyError(f"Artifact is missing the required {record_key!r} array for kind {kind!r}")
+    records = data[record_key]
+    if not isinstance(records, list):
+        raise TypeError(f"Artifact {record_key!r} must be a list, got {type(records).__name__}")
     meta = {k: data[k] for k in META_KEYS if k in data}
     rows: list[dict] = []
     for rec in records:
@@ -86,7 +91,7 @@ def dataset_card(kind: str, source: Path, n_rows: int, columns: list[str]) -> st
     cols = "\n".join(f"- `{c}`" for c in columns)
     return (
         f"# doc-benchmark {kind} dataset\n\n"
-        f"Exported from `{source}` ({version}).\n\n"
+        f"Exported from `{Path(source).name}` ({version}).\n\n"
         f"- **Kind:** {kind}\n"
         f"- **Rows:** {n_rows}\n"
         f"- **Schema version:** {version}\n\n"

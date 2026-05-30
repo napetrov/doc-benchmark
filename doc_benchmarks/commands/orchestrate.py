@@ -80,7 +80,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         print(f"\n📊 View full report: cat {results['steps']['report']['path']}")
 
     except Exception as e:
-        print(f"\n❌ Pipeline failed: {e}")
+        print(f"\n❌ Pipeline failed: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         sys.exit(1)
@@ -98,9 +98,9 @@ def register(sub, positive_int) -> None:
     eval_p.add_argument("--provider", default="openai", choices=["openai", "anthropic", "amazon-bedrock", "google-vertex", "openrouter", "openai-codex"])
     eval_p.add_argument("--judge-model", default="gpt-4o-mini", help="LLM model for evaluation")
     eval_p.add_argument("--judge-provider", default="openai", choices=["openai", "anthropic", "amazon-bedrock", "google-vertex", "openrouter", "openai-codex"])
-    eval_p.add_argument("--personas-count", type=int, default=5, help="Target number of personas")
-    eval_p.add_argument("--questions-per-topic", type=int, default=2, help="Questions per topic per persona")
-    eval_p.add_argument("--top-k", type=int, default=None, help="Docs to retrieve before reranking (default from config/products.yaml retrieval.top_k)")
+    eval_p.add_argument("--personas-count", type=positive_int, default=5, help="Target number of personas")
+    eval_p.add_argument("--questions-per-topic", type=positive_int, default=2, help="Questions per topic per persona")
+    eval_p.add_argument("--top-k", type=positive_int, default=None, help="Docs to retrieve before reranking (default from config/products.yaml retrieval.top_k)")
     eval_p.add_argument("--rerank-threshold", type=float, default=0.3, help="Min relevance score")
     eval_p.add_argument("--debug-retrieval", action="store_true", help="Include retrieval metadata")
     eval_p.add_argument("--doc-source", default="context7",

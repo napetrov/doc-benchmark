@@ -33,8 +33,8 @@ def test_committed_fixtures_validate():
         ("eval", REPO / "eval" / "onetbb.json"),
     ]
     for kind, path in cases:
-        if path.exists():
-            load_artifact(kind, path)  # raises on failure
+        assert path.exists(), f"missing committed fixture: {path}"
+        load_artifact(kind, path)  # raises on failure
 
 
 def test_stamp_sets_version():
@@ -77,3 +77,16 @@ def test_arms_schema_accepts_built_output():
         "summary": {"per_arm": {"baseline": {"avg_aggregate": 70.0, "n": 3}}},
     }
     validate_artifact("arms", out)
+
+
+def test_save_does_not_mutate_caller():
+    data = {"questions": [{"id": "q1", "text": "x"}]}
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as d:
+        save_artifact("questions", data, os.path.join(d, "q.json"))
+    assert "schema_version" not in data  # caller dict untouched
+
+
+def test_schema_version_const_rejects_wrong_value():
+    with pytest.raises(ArtifactValidationError):
+        validate_artifact("questions", {"schema_version": "questions.v2", "questions": []})

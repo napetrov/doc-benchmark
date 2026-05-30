@@ -32,6 +32,6 @@ doc-benchmark ...
 
 ## Logs / output
 
-```
+```text
 paste relevant output here
 ```

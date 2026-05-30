@@ -113,3 +113,12 @@ def test_docker_backend_missing_docker(monkeypatch):
     res = run_example("python", "print(1)", ExecutionPolicy(backend="docker"))
     assert res.status == "failed"
     assert "docker is not installed" in (res.error or "")
+
+
+def test_error_status_counts_as_failure(tmp_path):
+    """An unknown backend yields status=error and must not score 1.0."""
+    doc = tmp_path / "d.md"
+    doc.write_text("```python\nprint(1)\n```\n")
+    rate, results = score_examples(doc, ExecutionPolicy(backend="bogus"))
+    assert results[0].status == "error"
+    assert rate == 0.0

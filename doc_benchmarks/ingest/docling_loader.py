@@ -69,7 +69,14 @@ def materialize_markdown(inputs, out_dir) -> list[Path]:
     for src in inputs:
         src = Path(src)
         markdown = convert_to_markdown(src)
-        dest = out_dir / (src.stem + ".md")
+        # Disambiguate by suffix and a counter so same-named inputs (a.pdf, a.docx,
+        # or two a.pdf in different dirs) don't overwrite each other.
+        base = f"{src.stem}-{src.suffix.lstrip('.').lower()}"
+        dest = out_dir / f"{base}.md"
+        i = 2
+        while dest.exists():
+            dest = out_dir / f"{base}-{i}.md"
+            i += 1
         dest.write_text(markdown, encoding="utf-8")
         written.append(dest)
     return written

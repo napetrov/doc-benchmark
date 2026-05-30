@@ -55,13 +55,17 @@ def stamp(kind: str, data: dict) -> dict:
 
 
 def save_artifact(kind: str, data: dict, path: Path, *, validate: bool = True) -> None:
-    """Stamp, (optionally) validate, and write an artifact to ``path``."""
-    stamp(kind, data)
+    """Stamp, (optionally) validate, and write an artifact to ``path``.
+
+    Operates on a shallow copy so the caller's dict is not mutated.
+    """
+    payload = dict(data)
+    stamp(kind, payload)
     if validate:
-        validate_artifact(kind, data)
+        validate_artifact(kind, payload)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def load_artifact(kind: str, path: Path, *, validate: bool = True) -> dict:

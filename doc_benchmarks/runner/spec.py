@@ -47,6 +47,8 @@ def validate_spec(spec: dict, schema_path: Path | None = None) -> None:
         schema = json.loads(Path(schema_path).read_text(encoding="utf-8"))
     except OSError as exc:
         raise SpecValidationError(f"Failed to read spec schema: {schema_path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SpecValidationError(f"Invalid JSON in spec schema: {schema_path}: {exc}") from exc
 
     errors = sorted(Draft202012Validator(schema).iter_errors(spec), key=lambda e: list(e.path))
     if errors:
@@ -101,15 +103,20 @@ def select_docs(root: Path, manifest: dict) -> list[Path]:
     violates the manifest bounds.
     """
     root = Path(root)
+    root_resolved = root.resolve()
     include = manifest.get("include") or ["docs/**/*.md"]
     exclude = manifest.get("exclude") or []
 
     selected: set[Path] = set()
     for pattern in include:
-        selected.update(p for p in root.glob(pattern) if p.is_file())
+        for p in root.glob(pattern):
+            # Reject matches that escape root (e.g. via ".." in a pattern).
+            if p.is_file() and p.resolve().is_relative_to(root_resolved):
+                selected.add(p)
 
     docs = sorted(
-        p for p in selected if not _is_excluded(p.relative_to(root).as_posix(), exclude)
+        p for p in selected
+        if not _is_excluded(p.resolve().relative_to(root_resolved).as_posix(), exclude)
     )
 
     n = len(docs)

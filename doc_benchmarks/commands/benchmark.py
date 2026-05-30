@@ -61,7 +61,7 @@ def cmd_benchmark_run(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     output_dir = args.output_dir or f"results/{entry.key}"
-    n_runs = max(1, getattr(args, "multi_run", 1))
+    n_runs = getattr(args, "multi_run", 1)
     concurrency = getattr(args, "concurrency", 5)
     questions_from = getattr(args, "questions_from", None)
 
@@ -191,7 +191,7 @@ def register(sub, positive_int) -> None:
     bench_run_p.add_argument("--judge-provider", default="openai", dest="judge_provider",
                              choices=["openai", "anthropic", "amazon-bedrock", "google-vertex", "openrouter", "openai-codex"])
     bench_run_p.add_argument("--registry", default=None, help="Path to custom libraries.yaml")
-    bench_run_p.add_argument("--max-tokens", type=int, default=4000, dest="max_tokens",
+    bench_run_p.add_argument("--max-tokens", type=positive_int, default=4000, dest="max_tokens",
                              help="Max tokens to retrieve per question from doc source (default: 4000)")
     bench_run_p.add_argument("--concurrency", type=positive_int, default=5, dest="concurrency",
                              help="Parallel API calls for answering and judging (default: 5)")
@@ -202,7 +202,7 @@ def register(sub, positive_int) -> None:
                                   "Skips question generation entirely — essential for fair multi-model "
                                   "comparisons (all models evaluated on the same question set). "
                                   "Example: --questions-from results/onedal_gpt4o")
-    bench_run_p.add_argument("--multi-run", type=int, default=1, dest="multi_run",
+    bench_run_p.add_argument("--multi-run", type=positive_int, default=1, dest="multi_run",
                              metavar="N",
                              help="Run answer generation + evaluation N times (default: 1). "
                                   "N>=3 enables variance check in the trust gate. "
@@ -222,7 +222,7 @@ def register(sub, positive_int) -> None:
     bench_batch_p.add_argument("--judge-model", default="gpt-4o-mini", dest="judge_model")
     bench_batch_p.add_argument("--judge-provider", default="openai", dest="judge_provider",
                                choices=["openai", "anthropic", "amazon-bedrock", "google-vertex", "openrouter", "openai-codex"])
-    bench_batch_p.add_argument("--max-tokens", type=int, default=4000, dest="max_tokens",
+    bench_batch_p.add_argument("--max-tokens", type=positive_int, default=4000, dest="max_tokens",
                                help="Max tokens to retrieve per question from doc source (default: 4000)")
     bench_batch_p.add_argument("--force-regen", action="store_true", dest="force_regen",
                                help="Regenerate personas/questions even if cached files exist")

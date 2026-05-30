@@ -53,9 +53,11 @@ def _load_spec(spec_path: Path) -> dict:
         missing.append("metrics")
     else:
         metrics = data["metrics"]
-        if "freshness_lite" not in metrics or "max_age_days" not in metrics.get("freshness_lite", {}):
+        freshness_cfg = metrics.get("freshness_lite")
+        if not isinstance(freshness_cfg, dict) or "max_age_days" not in freshness_cfg:
             missing.append("metrics.freshness_lite.max_age_days")
-        if "readability" not in metrics or "grade_max" not in metrics.get("readability", {}):
+        readability_cfg = metrics.get("readability")
+        if not isinstance(readability_cfg, dict) or "grade_max" not in readability_cfg:
             missing.append("metrics.readability.grade_max")
 
     if missing:

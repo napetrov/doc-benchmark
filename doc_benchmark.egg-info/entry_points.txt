@@ -1,2 +1,0 @@
-[console_scripts]
-doc-benchmark = doc_benchmarks.cli:main

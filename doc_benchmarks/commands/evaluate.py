@@ -143,8 +143,19 @@ def cmd_eval_score(args: argparse.Namespace) -> None:
     from doc_benchmarks.eval import Judge
 
     # Load answers
-    answers_data = json.loads(Path(args.answers).read_text())
-    answers = answers_data.get("answers", answers_data)
+    try:
+        answers_data = json.loads(Path(args.answers).read_text())
+    except FileNotFoundError:
+        print(f"Error: answers file not found: {args.answers}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as exc:
+        print(f"Error: invalid JSON in {args.answers}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    answers = answers_data.get("answers", answers_data) if isinstance(answers_data, dict) else answers_data
+    if not isinstance(answers, list):
+        print(f"Error: expected a list of answers in {args.answers}", file=sys.stderr)
+        sys.exit(1)
     print(f"Loaded {len(answers)} answers from {args.answers}")
 
     answer_model = answers_data.get("model", "unknown") if isinstance(answers_data, dict) else "unknown"

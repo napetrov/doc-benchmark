@@ -8,6 +8,21 @@ import sys
 from pathlib import Path
 
 
+def _extract_questions(questions_data, source: str) -> list:
+    """Return the question list from object- or list-shaped JSON, or exit cleanly."""
+    if isinstance(questions_data, dict):
+        raw = questions_data.get("questions", [])
+    elif isinstance(questions_data, list):
+        raw = questions_data
+    else:
+        print(f"Error: expected a JSON object or list of questions in {source}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(raw, list):
+        print(f"Error: 'questions' must be a list in {source}", file=sys.stderr)
+        sys.exit(1)
+    return raw
+
+
 def cmd_questions_panel_review(args: argparse.Namespace) -> None:
     """Panel review of question quality with 3 role-differentiated LLM reviewers."""
     from doc_benchmarks.questions.panel_reviewer import QuestionPanelReviewer, DEFAULT_REVIEWERS
@@ -24,9 +39,15 @@ def cmd_questions_panel_review(args: argparse.Namespace) -> None:
         print(f"Error: file not found: {args.questions}", file=sys.stderr)
         sys.exit(1)
 
-    # Extract question strings from various JSON shapes
+    # Extract question strings from various JSON shapes. Prefer explicit keys by
+    # presence (not truthiness) so an existing-but-empty list isn't overridden.
     if isinstance(questions_data, dict):
-        raw = questions_data.get("questions") or questions_data.get("answers") or list(questions_data.values())
+        if "questions" in questions_data:
+            raw = questions_data["questions"]
+        elif "answers" in questions_data:
+            raw = questions_data["answers"]
+        else:
+            raw = list(questions_data.values())
     else:
         raw = questions_data
     if not isinstance(raw, list):
@@ -68,7 +89,7 @@ def cmd_questions_refine(args: argparse.Namespace) -> None:
     from doc_benchmarks.questions.refiner import QuestionRefiner, GapFiller
 
     questions_data = json.loads(Path(args.questions).read_text())
-    raw = questions_data.get("questions", questions_data)
+    raw = _extract_questions(questions_data, args.questions)
 
     target = {
         "beginner":     args.target_beginner,
@@ -115,7 +136,7 @@ def cmd_questions_analyze(args: argparse.Namespace) -> None:
     from doc_benchmarks.questions.normalizer import normalize_questions
 
     questions_data = json.loads(Path(args.questions).read_text())
-    raw = questions_data.get("questions", questions_data)
+    raw = _extract_questions(questions_data, args.questions)
     if raw and isinstance(raw[0], dict):
         normalized = normalize_questions(raw)
         questions = [q["question"] for q in normalized]

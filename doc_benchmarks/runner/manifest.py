@@ -34,7 +34,11 @@ def _git(*args: str) -> str | None:
 
 def file_sha256(path: Path) -> str | None:
     try:
-        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        h = hashlib.sha256()
+        with Path(path).open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
     except OSError:
         return None
 

@@ -246,8 +246,10 @@ def score_examples(
         res.index = idx
         results.append(res)
 
-    executed = [r for r in results if r.status in ("passed", "failed")]
+    # "error" rows (e.g. unknown backend) count as executed failures so a broken
+    # config never reports a perfect pass rate; "skipped" rows are excluded.
+    executed = [r for r in results if r.status in ("passed", "failed", "error")]
     if not executed:
         return 1.0, results
-    passed = sum(1 for r in executed if r.passed)
+    passed = sum(1 for r in executed if r.status == "passed")
     return round(passed / len(executed), 4), results

@@ -1,9 +1,10 @@
 # Assessment of external review feedback + productization plan
 
-**Status:** Proposed. This is an evaluation of an external code-review of the
-repository and a prioritized plan for acting on it. Nothing here is implemented
-yet; the actionable items are mirrored as new entries in
-[../../BACKLOG.md](../../BACKLOG.md).
+**Status:** Implemented in PR #56 (as of 2026-05-29 this was *proposed*; the
+P0–P2 items were subsequently implemented in the same PR). This is an evaluation
+of an external code-review of the repository and the prioritized plan that was
+acted on; the actionable items are mirrored in
+[../../BACKLOG.md](../../BACKLOG.md) (#57).
 
 **Date:** 2026-05-29
 
