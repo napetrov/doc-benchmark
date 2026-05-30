@@ -13,6 +13,7 @@ from doc_benchmarks.commands import (
     dashboard,
     dataset,
     evaluate,
+    ingest,
     library,
     orchestrate,
     personas,
@@ -53,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.register(sub, positive_int)       # dashboard
     arms.register(sub, positive_int)            # arms
     dataset.register(sub, positive_int)         # dataset
+    ingest.register(sub, positive_int)          # ingest
 
     return p
 
