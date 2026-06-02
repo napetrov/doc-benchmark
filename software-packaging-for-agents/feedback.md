@@ -72,8 +72,10 @@ before it shows up as a bad review.
 Because the loop re-scores, every scorecard must be **reproducible and dated**:
 which benchmark, question-set hash, judge model, library version, and date. This
 keeps re-scores comparable over time and makes the credential auditable — the
-foundation any "vetted catalog" claim rests on. (Whether to cryptographically
-*sign* scorecards is a possible later step, deliberately out of scope here.)
+foundation any "vetted catalog" claim rests on. Making that credential *portable*
+— signed so a third-party catalog can verify it without trusting us — is the
+cross-cutting [attestation](attestation.md) design, built directly on this
+reproducible-and-dated foundation.
 
 ## 4. Guardrails
 

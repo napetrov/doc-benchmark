@@ -49,6 +49,7 @@ back to author/measure.
 | [`discovery.md`](discovery.md) | **Discover** — capability/intent graph + semantic search, ranked by vetted scorecard rather than popularity. | Draft |
 | [`serving.md`](serving.md) | **Serve** — spawning a problem-scoped Intel expert; the graph as a fleet router; telemetry out. | Draft |
 | [`feedback.md`](feedback.md) | **Loop** — telemetry + freshness re-score the scorecard so the credential stays living. | Draft |
+| [`attestation.md`](attestation.md) | **Trust (cross-cutting)** — the scorecard as a signed, portable credential other catalogs can verify. | Draft |
 
 ## The discovery problem
 

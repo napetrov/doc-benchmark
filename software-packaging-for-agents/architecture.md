@@ -73,6 +73,15 @@ A scorecard stamped once at build time goes stale. The loop makes it **living**
 shippable agent. Packaging is largely *serializing and adapting* this existing
 representation, not inventing a new one.
 
+## Cross-cutting: attestation (the trust layer)
+
+The scorecard threads through package → discover → feedback, so its
+*trustworthiness* is a cross-cutting concern, not a single track. The scorecard
+becomes a **signed, reproducible credential** any consumer — including a
+third-party catalog — can verify without trusting us: the trust layer under any
+listing, not just a better listing of our own. A deliberate strategic bet, later
+than the core cycle. Design: [`attestation.md`](attestation.md).
+
 ## Open architectural questions
 
 Tracked in the branch plan; to be resolved with design docs:

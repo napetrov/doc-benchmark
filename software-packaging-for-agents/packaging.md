@@ -139,7 +139,9 @@ never ask "how do we ship the winner?" This format closes that loop:
 
 This also gives the long-tail story teeth: a numerical-accuracy tool that will
 never *trend* can still ship a strong, comparable scorecard, and the catalog can
-rank on that instead of popularity (see discovery doc).
+rank on that instead of popularity (see discovery doc). Making that scorecard a
+*signed, portable* credential a third-party catalog can verify is the
+cross-cutting [attestation](attestation.md) design.
 
 ## 5. Per-runtime exporters
 

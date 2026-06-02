@@ -26,6 +26,8 @@ The framing is a closed six-track cycle
   scorecard not popularity (the anti-"trending" design).
 - `serving.md` — spawn a problem-scoped expert; graph as a fleet router; telemetry.
 - `feedback.md` — telemetry + freshness re-score the scorecard (living credential).
+- `attestation.md` — cross-cutting: the scorecard as a signed, portable credential
+  third-party catalogs can verify (the trust layer, not just a better listing).
 
 Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):
 - **#58a — Agent-package builder.** Serialize `treatments/base.py` `AgentConfig`
@@ -44,6 +46,10 @@ Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):
   `eval/agent_runner.py`; problem-scoped spawn; graph as router.
 - **#58h — Feedback loop.** Telemetry → new golden questions → re-score;
   `freshness_lite` marks scorecards stale → CI re-evaluation.
+- **#58i — Scorecard attestation (strategic, later).** Complete the scorecard
+  provenance (reuse `artifacts.py` schema_version, `runner/manifest.py`,
+  `question_set_hash`), make it reproducible-and-dated, then sign it so external
+  catalogs can verify the claim without trusting us.
 
 First proof package: `concise_expert` profile + `onetbb-quickstart` skill +
 Context7 MCP for oneTBB — built entirely from existing fixtures.
