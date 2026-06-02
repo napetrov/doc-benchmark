@@ -1,14 +1,14 @@
 # Design: the discovery layer (capability graph, not a trend ranking)
 
-> **Status:** DRAFT — for review by Emmanuel & Nikolay. Defines the *discover*
-> track of the [architecture](../architecture.md). Tech-agnostic by intent;
+> **Status:** DRAFT — for team review. Defines the *discover*
+> track of the [architecture](architecture.md). Tech-agnostic by intent;
 > graph-DB and embedding choices are left open (Q4).
 > **Date:** 2026-06-02
 
 ## 1. The problem: popularity ranking buries the catalog we care about
 
 Agent-artifact marketplaces rank by popularity. The reference listing
-([cursor.directory](https://cursor.directory/)) is, in Emmanuel's words,
+([cursor.directory](https://cursor.directory/)) is, in the project's framing,
 
 > "81.4k+ developers, ranked by what's trending."
 
@@ -44,11 +44,11 @@ Markdown tables rather than being one queryable structure.
 
 | Graph element | Existing source in the repo |
 |---|---|
-| Library / product nodes | [`libraries.yaml`](../../doc-benchmark/libraries.yaml) — 22 products with name, description, repo, doc sources, grouped by domain (Threading, Math & Numerics, …) |
-| API / concept nodes + "task covers API" edges | [`terminal-bench-tasks/COVERAGE.md`](../../doc-benchmark/terminal-bench-tasks/COVERAGE.md) — per-component API/concept → task → verifier matrix |
+| Library / product nodes | [`libraries.yaml`](../doc-benchmark/libraries.yaml) — 22 products with name, description, repo, doc sources, grouped by domain (Threading, Math & Numerics, …) |
+| API / concept nodes + "task covers API" edges | [`terminal-bench-tasks/COVERAGE.md`](../doc-benchmark/terminal-bench-tasks/COVERAGE.md) — per-component API/concept → task → verifier matrix |
 | Skill nodes + trigger hints | `data/skills/*/SKILL.md` frontmatter `description` (the trigger hint) |
 | Agent-profile nodes | `data/agent_profiles/*.md` frontmatter `description` |
-| Package nodes + scorecards | the [agent package format](agent-package-format.md) manifests |
+| Package nodes + scorecards | the [agent package format](packaging.md) manifests |
 | Capability evidence | `report/arms_report.py` per-arm deltas |
 
 This is closer to a knowledge graph than the current writing admits. The
@@ -65,7 +65,7 @@ collect new data.
 - `Library` — from `libraries.yaml` (oneTBB, oneMKL, …).
 - `API` / `Concept` — from `COVERAGE.md` (`parallel_reduce`, `cblas_dgemm`, `flow::graph`, …).
 - `Skill`, `AgentProfile`, `MCPSource` — the package artifacts.
-- `Package` — a shipped [agent package](agent-package-format.md).
+- `Package` — a shipped [agent package](packaging.md).
 - `Task` — terminal-bench executable tasks (behavioral evidence).
 - `Scorecard` — benchmark evidence attached to packages/treatments.
 
@@ -118,7 +118,7 @@ discovery layer does not introduce a new heavy dependency by default.
 
 - **Q4 — graph & embedding stack.** Property graph (Neo4j-style) vs RDF/triples
   vs a lightweight in-repo graph (NetworkX + a vector index)? Reuse the existing
-  `embeddings` extra, or a dedicated store? Kept open pending Emmanuel/Nikolay.
+  `embeddings` extra, or a dedicated store? Kept open pending team decision.
 - **Capability taxonomy.** Hand-curate the initial `Capability` vocabulary from
   `COVERAGE.md`, or derive it from doc/skill embeddings and cluster? Likely a
   seed-then-grow hybrid.
@@ -129,7 +129,7 @@ discovery layer does not introduce a new heavy dependency by default.
 
 ## 9. Relationship to the rest of the project
 
-The discovery layer sits downstream of [packaging](agent-package-format.md): it
+The discovery layer sits downstream of [packaging](packaging.md): it
 indexes packages and their scorecards. It is upstream of *use*: an agent hits the
 graph to find the right package, installs it, and (per the BKM) loads the thin
 skill, reaching for MCP on demand. The benchmark remains the authority that makes

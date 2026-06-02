@@ -1,8 +1,8 @@
 # Architecture (framing skeleton)
 
-> **Status:** Skeleton. Detailed design docs land under `decisions/` per the
-> branch plan. This file fixes the shape so contributors know where each piece
-> goes.
+> **Status:** Skeleton. This file fixes the shape so contributors know where
+> each piece goes; the detailed design lives in [`packaging.md`](packaging.md)
+> and [`discovery.md`](discovery.md).
 
 The project is a closed loop with four conceptual tracks. The first
 (**measure**) is built today as [`../doc-benchmark/`](../doc-benchmark/); the
@@ -34,10 +34,10 @@ other three are the subject of this directory.
 3. **Package** — serialize an agent configuration (system prompt + skills +
    MCP references + provenance + scorecard) into a manifest, then export it per
    runtime (Claude plugin, Anthropic Agent Skills layout, Hermes, generic).
-   Design: [`decisions/agent-package-format.md`](decisions/agent-package-format.md).
+   Design: [`packaging.md`](packaging.md).
 4. **Discover** — a capability/intent graph with semantic search so niche tools
    surface by *fit*, not popularity. Design:
-   [`decisions/discovery-graph.md`](decisions/discovery-graph.md).
+   [`discovery.md`](discovery.md).
 
 ## Key idea: AgentConfig is already a package
 

@@ -1,7 +1,7 @@
 # Design: the agent package format
 
-> **Status:** DRAFT — for review by Emmanuel & Nikolay. Defines the *package*
-> track of the [architecture](../architecture.md). No code yet; this fixes the
+> **Status:** DRAFT — for team review. Defines the *package*
+> track of the [architecture](architecture.md). No code yet; this fixes the
 > shape so the builder/exporters can be specced.
 > **Date:** 2026-06-02
 
@@ -17,7 +17,7 @@ three artifacts from the architecture mainline —
 
 The key observation: `doc-benchmark` already has the in-memory representation of
 exactly this. A treatment's
-[`AgentConfig`](../../doc-benchmark/doc_benchmarks/treatments/base.py) is
+[`AgentConfig`](../doc-benchmark/doc_benchmarks/treatments/base.py) is
 
 ```python
 AgentConfig(
@@ -76,14 +76,14 @@ scorecard:                                       # the shipped credential (§4)
 
 Notes:
 - `agent_profile`, `skills`, and `mcp` map **1:1** onto the existing loaders
-  ([`load_agent_profile`](../../doc-benchmark/doc_benchmarks/agent_profiles/loader.py),
-  [`load_skill`](../../doc-benchmark/doc_benchmarks/skills/loader.py)) and the
+  ([`load_agent_profile`](../doc-benchmark/doc_benchmarks/agent_profiles/loader.py),
+  [`load_skill`](../doc-benchmark/doc_benchmarks/skills/loader.py)) and the
   `mcp:<ref>` doc source. Skill files already follow the Anthropic Agent Skills
   `SKILL.md` convention (frontmatter `name`/`description` + body), so they are
   portable as-is.
 - `scorecard` is what makes this package *vetted* rather than merely *listed*
   (see §4). It is optional in the schema but strongly encouraged; the catalog
-  ranks on it (see [discovery-graph.md](discovery-graph.md)).
+  ranks on it (see [discovery.md](discovery.md)).
 
 ## 3. The two-tier BKM (the load-bearing design principle)
 
@@ -98,7 +98,7 @@ several options:
 - **Tier 1 — the skill (always available, thin).** A compact `SKILL.md` that
   states *when to engage*, the canonical idioms, and the few pitfalls that
   actually matter. The committed
-  [`onetbb-quickstart/SKILL.md`](../../doc-benchmark/data/skills/onetbb-quickstart/SKILL.md)
+  [`onetbb-quickstart/SKILL.md`](../doc-benchmark/data/skills/onetbb-quickstart/SKILL.md)
   is exactly this shape: headers, the parallel-loop/reduce idioms, CMake wiring,
   and three pitfalls — nothing more.
 - **Tier 2 — MCP (on-demand, thick).** The skill tells the agent *when* to reach
@@ -123,7 +123,7 @@ The current `doc-benchmark` decision docs stop at *measuring* a treatment; they
 never ask "how do we ship the winner?" This format closes that loop:
 
 - The benchmark's per-arm report
-  ([`report/arms_report.py`](../../doc-benchmark/doc_benchmarks/report/arms_report.py))
+  ([`report/arms_report.py`](../doc-benchmark/doc_benchmarks/report/arms_report.py))
   produces each arm's average judge score and its delta vs baseline.
 - The package's `scorecard` block is a serialization of that result for *this*
   configuration.

@@ -14,10 +14,9 @@ Intel expert agents (agent_profile + skills + MCP) for runtimes like Claude and
 Hermes. Measurement (this project) is the **gate**, not the product.
 
 Framing docs (in `../software-packaging-for-agents/`):
-- `decisions/2026-06-02-packaging-vision-review.md` — the eval→ship review.
-- `decisions/agent-package-format.md` — manifest, two-tier BKM (doc=skill →
+- `agent-package-format.md` — manifest, two-tier BKM (doc=skill →
   MCP on demand), evidence-as-credential, per-runtime exporters.
-- `decisions/discovery-graph.md` — capability/intent graph + semantic search,
+- `discovery-graph.md` — capability/intent graph + semantic search,
   ranked by vetted scorecard not popularity (the anti-"trending" design).
 
 Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):

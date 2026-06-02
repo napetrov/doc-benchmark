@@ -31,8 +31,8 @@ always-available skill that knows when to reach for a thick doc source.
 | File | Purpose | Status |
 |---|---|---|
 | [`architecture.md`](architecture.md) | The package/distribute/discover tracks and how they compose with the measurement engine. | Skeleton |
-| [`decisions/agent-package-format.md`](decisions/agent-package-format.md) | The agent-package manifest, the two-tier BKM, evidence-as-credential, and per-runtime exporters. | Draft |
-| [`decisions/discovery-graph.md`](decisions/discovery-graph.md) | Capability/intent graph + semantic search, ranked by vetted scorecard rather than popularity. | Draft |
+| [`packaging.md`](packaging.md) | The agent-package manifest, the two-tier BKM, evidence-as-credential, and per-runtime exporters. | Draft |
+| [`discovery.md`](discovery.md) | Capability/intent graph + semantic search, ranked by vetted scorecard rather than popularity. | Draft |
 
 ## The discovery problem
 
@@ -40,7 +40,7 @@ Marketplaces rank by popularity / "what's trending." That structurally buries
 niche HPC and numerical-accuracy tools, which will never trend among average
 developers. The planned discovery layer replaces keyword/trend ranking with a
 **capability/intent graph + semantic search**, using the benchmark scorecard as
-a *vetted* ranking signal. Design doc to follow.
+a *vetted* ranking signal. See [`discovery.md`](discovery.md).
 
 ## Relationship to `doc-benchmark/`
 
