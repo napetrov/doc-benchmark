@@ -4,6 +4,37 @@
 
 ---
 
+### #58 — Packaging & distribution track (software-packaging-for-agents)
+**Scope:** Project framing / packaging / discovery
+**Status:** FRAMING (docs landed; code deferred)
+
+The repo became an umbrella monorepo: this benchmark moved under `doc-benchmark/`
+and a new `software-packaging-for-agents/` track holds the framing for shipping
+Intel expert agents (agent_profile + skills + MCP) for runtimes like Claude and
+Hermes. Measurement (this project) is the **gate**, not the product.
+
+Framing docs (in `../software-packaging-for-agents/`):
+- `decisions/2026-06-02-packaging-vision-review.md` — the eval→ship review.
+- `decisions/agent-package-format.md` — manifest, two-tier BKM (doc=skill →
+  MCP on demand), evidence-as-credential, per-runtime exporters.
+- `decisions/discovery-graph.md` — capability/intent graph + semantic search,
+  ranked by vetted scorecard not popularity (the anti-"trending" design).
+
+Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):
+- **#58a — Agent-package builder.** Serialize `treatments/base.py` `AgentConfig`
+  (+ a benchmark scorecard) into a `package.yaml` manifest; `package build` CLI.
+- **#58b — Per-runtime exporters.** Anthropic Agent Skills layout first
+  (`SKILL.md` already conforms), then Claude plugin, then Hermes/generic.
+- **#58c — Discovery graph.** Consolidate `libraries.yaml` + `COVERAGE.md` +
+  fixtures into one capability graph; fit-based + scorecard ranking.
+- **#58d — Eval-scorecard-as-credential.** Wire `report/arms_report.py` output
+  into the package manifest as the shipped, gating credential.
+
+First proof package: `concise_expert` profile + `onetbb-quickstart` skill +
+Context7 MCP for oneTBB — built entirely from existing fixtures.
+
+---
+
 ### #57 — Productization hardening (external-review response)
 **Scope:** Repo hygiene / contracts / packaging / CI
 **Status:** DONE (P0–P2 landed)

@@ -34,9 +34,10 @@ other three are the subject of this directory.
 3. **Package** — serialize an agent configuration (system prompt + skills +
    MCP references + provenance + scorecard) into a manifest, then export it per
    runtime (Claude plugin, Anthropic Agent Skills layout, Hermes, generic).
-   *Design doc: `decisions/` (planned).*
+   Design: [`decisions/agent-package-format.md`](decisions/agent-package-format.md).
 4. **Discover** — a capability/intent graph with semantic search so niche tools
-   surface by *fit*, not popularity. *Design doc: `decisions/` (planned).*
+   surface by *fit*, not popularity. Design:
+   [`decisions/discovery-graph.md`](decisions/discovery-graph.md).
 
 ## Key idea: AgentConfig is already a package
 

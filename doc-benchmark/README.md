@@ -1,5 +1,12 @@
 # doc-benchmark
 
+> **Part of a larger project.** This is the *measurement engine* half of the
+> [Software Packaging for Agents](../README.md) umbrella repo. It evaluates
+> whether a given skill / MCP doc source / agent profile actually improves agent
+> answers — the evidence (scorecard) that gates whether an artifact is worth
+> packaging and shipping. The packaging & discovery half lives in
+> [`../software-packaging-for-agents/`](../software-packaging-for-agents/).
+
 `doc-benchmark` is a toolkit for measuring and improving technical documentation quality. It supports two complementary workflows:
 
 1. **Static documentation quality checks** over Markdown/code examples: coverage, freshness, readability, example execution, gates, and regression detection.

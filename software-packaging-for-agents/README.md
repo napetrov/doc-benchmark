@@ -6,10 +6,10 @@ and use it effectively. The companion [`../doc-benchmark/`](../doc-benchmark/)
 provides the measurement engine that decides whether a packaged artifact is
 actually worth shipping.
 
-> **Status:** Bootstrapping. This is the skeleton; the design documents below
-> are being written on the `packaging-distribution-vision` branch. See the
-> umbrella [README](../README.md) for the project loop and the architecture
-> mainline being explored.
+> **Status:** Framing in progress on the `packaging-distribution-vision` branch.
+> The architecture and the first two design docs (packaging format, discovery
+> graph) are drafted; see the umbrella [README](../README.md) for the project
+> loop and the architecture mainline being explored.
 
 ## Why this exists
 
@@ -26,12 +26,13 @@ The mainline hypothesis: *documentation behaves as a general skill, and MCP (or
 an equivalent) is how an agent asks for the relevant part on demand* — a thin,
 always-available skill that knows when to reach for a thick doc source.
 
-## Planned contents
+## Contents
 
 | File | Purpose | Status |
 |---|---|---|
-| `architecture.md` | The package/distribute/discover tracks and how they compose with the measurement engine. | Skeleton |
-| `decisions/` | Design docs: agent-package format, per-runtime distribution, discovery graph. | Planned |
+| [`architecture.md`](architecture.md) | The package/distribute/discover tracks and how they compose with the measurement engine. | Skeleton |
+| [`decisions/agent-package-format.md`](decisions/agent-package-format.md) | The agent-package manifest, the two-tier BKM, evidence-as-credential, and per-runtime exporters. | Draft |
+| [`decisions/discovery-graph.md`](decisions/discovery-graph.md) | Capability/intent graph + semantic search, ranked by vetted scorecard rather than popularity. | Draft |
 
 ## The discovery problem
 
