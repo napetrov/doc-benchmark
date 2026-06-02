@@ -1,9 +1,15 @@
 # Software Packaging for Agents
 
 Usage is shifting from human developers to **agentic AI consumers**. Software —
-especially expert, high-performance, and numerically-sensitive libraries — needs
-to be packaged for *that* audience: reachable by an agent, practical to apply,
-and carrying its own best-known-methods (BKMs), setup guidance, and idioms.
+especially expert, high-performance, and numerically-sensitive Intel software and
+hardware — needs to be packaged for *that* audience: reachable by an agent,
+practical to apply, and carrying its own best-known-methods (BKMs), setup
+guidance, and idioms.
+
+The deliverable is a **summonable Intel expert**:
+
+> Spawn an Intel expert for a specific Intel software or hardware product
+> problem, pre-equipped with all the skills and MCP sources that expert needs.
 
 This repository pursues that mission in two complementary halves:
 
@@ -12,20 +18,23 @@ This repository pursues that mission in two complementary halves:
 | [`software-packaging-for-agents/`](software-packaging-for-agents/) | **Framing & architecture** — the vision, the agent-package format, per-runtime distribution (Claude, Hermes, …), and the discovery layer. | Bootstrapping |
 | [`doc-benchmark/`](doc-benchmark/) | **Measurement engine** — evaluates whether a given skill / MCP doc source / agent profile actually improves agent answers and task outcomes. The evidence that justifies shipping an artifact. | Established |
 
-## The loop
+## The cycle
 
 ```text
-        build ─────────► measure ─────────► package ─────────► publish
-   (agent_profile +    (doc-benchmark:     (manifest +       (discoverable
-    skills + MCP)       arms, judges,       per-runtime        catalog, not
-                        terminal-bench)     adapters)          trend-ranked)
-        ▲                                                          │
-        └──────────────────  feedback / scorecard  ◄───────────────┘
+   author ─► build ─► measure ─► package ─► discover ─► serve
+  (distill           (doc-bench: (manifest  (capability  (spawn the
+   skills +           arms,       + score-   graph,        problem-scoped
+   setup              judges,     card,      ranked by     expert; BKM runs;
+   guides)            tasks)      exporters) fit not       telemetry out)
+      ▲                                       trend)            │
+      └───────── feedback: telemetry + freshness re-score ──────┘
 ```
 
-Measurement is the **gate**, not the product: a packaged agent ships with the
+Measurement is the **gate**, not the product: a spawned expert ships with the
 scorecard that earned it — a deliberate contrast to popularity/trend-ranked
-marketplaces, which structurally bury niche HPC and numerical-accuracy tools.
+marketplaces, which structurally bury niche HPC and numerical-accuracy tools. The
+feedback loop keeps that scorecard *living* as real usage and upstream docs
+change.
 
 ## Architecture mainline being explored
 
@@ -41,7 +50,7 @@ full framing and architecture.
 ```text
 README.md                          This umbrella overview
 Makefile                           Delegates targets into each area
-software-packaging-for-agents/     Framing, architecture, packaging & discovery design
+software-packaging-for-agents/     Framing & architecture (author/package/discover/serve/feedback)
 doc-benchmark/                     The measurement engine (self-contained Python project)
 LICENSE  NOTICE                    Apache-2.0 + attribution (repo-wide)
 .github/workflows/                 CI (runs inside doc-benchmark/)

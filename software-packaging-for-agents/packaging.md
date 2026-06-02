@@ -7,13 +7,16 @@
 
 ## 1. What we are packaging
 
-An **agent package** is the distributable unit that turns a general model into a
-domain expert (e.g. an Intel HPC engineer) for a target runtime. It bundles the
-three artifacts from the architecture mainline —
+An **agent package** is the distributable unit behind a [summonable Intel
+expert](serving.md): the substrate that turns a general model into a domain
+expert (e.g. an Intel HPC engineer, or a Gaudi/Xeon hardware expert) for a target
+runtime. It bundles the artifacts from the architecture mainline —
 
-> Intel expert persona → system prompt, skills, and MCP.
+> Intel expert persona → system prompt, skills, and MCP (+ setup guide).
 
 — plus the provenance and the **evidence** that the bundle is worth installing.
+The persona is the expert's *face*; the skills, MCP, and setup guide are what
+make that expert actually competent.
 
 The key observation: `doc-benchmark` already has the in-memory representation of
 exactly this. A treatment's
@@ -50,14 +53,16 @@ description: >
 version: 0.1.0
 license: Apache-2.0
 
-# ── The three artifacts (the mainline) ──────────────────────────────────────
-agent_profile: profiles/onetbb-expert.md      # → AgentConfig.system_prompt
+# ── The artifacts (the mainline) ─────────────────────────────────────────────
+agent_profile: profiles/onetbb-expert.md      # → AgentConfig.system_prompt (the expert's face)
 skills:                                        # → injected_context / skill tools
   - skills/onetbb-quickstart/SKILL.md
 mcp:                                            # → on-demand doc retrieval (Tool)
   - ref: http=https://mcp.context7.com/mcp
     library_id: uxlfoundation/onetbb
     role: docs                                  # "ask the relevant part" tier
+setup_guide: setup/onetbb-env.sh               # executable, sandbox-verified env bootstrap
+                                                # (critical for hardware experts — see authoring.md)
 
 # ── Provenance & evidence ───────────────────────────────────────────────────
 provenance:

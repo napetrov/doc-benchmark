@@ -4,40 +4,66 @@
 > each piece goes; the detailed design lives in [`packaging.md`](packaging.md)
 > and [`discovery.md`](discovery.md).
 
-The project is a closed loop with four conceptual tracks. The first
-(**measure**) is built today as [`../doc-benchmark/`](../doc-benchmark/); the
-other three are the subject of this directory.
+The project is a **closed cycle** of six tracks. Only **measure** is built
+today (as [`../doc-benchmark/`](../doc-benchmark/)); the others are the subject
+of this directory. The cycle matters more than any single track: artifacts are
+authored, proven, shipped, found, *used*, and the evidence from real use flows
+back to re-author and re-score them.
 
 ```text
-   ┌─────────── build ───────────┐     ┌────────── measure ──────────┐
-   │ agent_profile (system prompt)│     │ doc-benchmark:              │
-   │ skills (SKILL.md + BKMs)     │────►│  treatment arms, judges,    │
-   │ mcp doc sources              │     │  terminal-bench outcomes    │
-   └──────────────────────────────┘     └──────────────┬──────────────┘
-                                                        │ scorecard (gate)
-                                                        ▼
-   ┌────────── package ──────────┐     ┌────────── discover ─────────┐
-   │ manifest = profile + skills │     │ capability/intent graph     │
-   │  + mcp refs + provenance    │────►│  + semantic search          │
-   │ per-runtime adapters:       │     │  ranked by vetted scorecard,│
-   │  Claude, Hermes, generic    │     │  not popularity/trend       │
-   └──────────────────────────────┘     └─────────────────────────────┘
+        ┌──────────────────────── the feedback loop ───────────────────────────┐
+        │                                                                       │
+        ▼                                                                       │
+  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+  │  AUTHOR  │──►│  BUILD   │──►│ MEASURE  │──►│ PACKAGE  │──►│ DISCOVER │──►│  SERVE   │
+  │ distill  │   │ assemble │   │ doc-     │   │ manifest │   │ capability│  │ runtime, │
+  │ skills + │   │ profile +│   │ bench:   │   │ + score- │   │ graph +   │  │ BKM runs,│
+  │ setup    │   │ skills + │   │ arms,    │   │ card,    │   │ semantic  │  │ telemetry│
+  │ guides   │   │ mcp      │   │ tasks    │   │ exporters│   │ search    │  │ out      │
+  └──────────┘   └──────────┘   └────┬─────┘   └──────────┘   └──────────┘   └────┬─────┘
+       ▲                             │ scorecard (gate)                           │
+       │                             └────────────────────────────────────────┐  │
+       │   telemetry → new questions → re-score → re-package (the living loop) │  │
+       └──────────────────────────────────────────────────────────────────────┴──┘
 ```
 
 ## Tracks
 
-1. **Build** — author the agent-facing artifacts. Today these exist as
+1. **Author** — manufacture the artifacts at scale: distill a thin Tier-1
+   `SKILL.md` from a library's docs and iterate it against the benchmark, and
+   produce the executable **setup guide** (environment bootstrap) that HPC
+   agents actually need. Today only one skill exists, hand-written. Design:
+   [`authoring.md`](authoring.md).
+2. **Build** — assemble the authored artifacts into an agent configuration
+   (`AgentConfig`: system prompt + skills + mcp + tools). Today these exist as
    benchmark fixtures (`../doc-benchmark/data/agent_profiles/`,
    `../doc-benchmark/data/skills/`).
-2. **Measure** — `doc-benchmark/`. The scorecard is the gate: only artifacts
-   that demonstrably improve answers/task outcomes get packaged.
-3. **Package** — serialize an agent configuration (system prompt + skills +
-   MCP references + provenance + scorecard) into a manifest, then export it per
-   runtime (Claude plugin, Anthropic Agent Skills layout, Hermes, generic).
-   Design: [`packaging.md`](packaging.md).
-4. **Discover** — a capability/intent graph with semantic search so niche tools
-   surface by *fit*, not popularity. Design:
-   [`discovery.md`](discovery.md).
+3. **Measure** — `doc-benchmark/`. The scorecard is the gate: only artifacts
+   that demonstrably improve answers/task outcomes get packaged. The scorecard
+   carries *both* Q&A-judge deltas and behavioral terminal-bench pass-rates.
+4. **Package** — serialize the agent configuration (+ scorecard + provenance)
+   into a manifest and export it per runtime (Claude plugin, Anthropic Agent
+   Skills layout, Hermes, generic). Design: [`packaging.md`](packaging.md).
+5. **Discover** — a capability/intent graph with semantic search so niche tools
+   surface by *fit*, not popularity. Design: [`discovery.md`](discovery.md).
+6. **Serve** — the runtime where an agent loads a package, the two-tier BKM
+   runs (thin skill → on-demand MCP), and real usage emits telemetry. The graph
+   doubles as a **router** across a fleet of packaged experts. Design:
+   [`serving.md`](serving.md).
+
+## The feedback loop closes the cycle
+
+A scorecard stamped once at build time goes stale. The loop makes it **living**
+(design: [`feedback.md`](feedback.md)):
+
+- **Serve → Measure.** Real questions and observed failures from production
+  become new golden questions in the existing `personas`/`questions` track;
+  re-scoring keeps the credential current.
+- **Upstream-docs → Package.** The static `freshness_lite` signal marks a
+  package's scorecard *stale* when a library's docs change, triggering CI
+  re-evaluation and re-packaging.
+- **Telemetry → Author.** Where agents loop, mis-trigger a skill, or work around
+  a gap tells the authoring track what to distill or fix next.
 
 ## Key idea: AgentConfig is already a package
 

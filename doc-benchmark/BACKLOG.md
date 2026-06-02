@@ -4,20 +4,28 @@
 
 ---
 
-### #58 — Packaging & distribution track (software-packaging-for-agents)
-**Scope:** Project framing / packaging / discovery
+### #58 — Software-packaging-for-agents track (summonable Intel expert)
+**Scope:** Project framing / packaging / discovery / serving
 **Status:** FRAMING (docs landed; code deferred)
 
 The repo became an umbrella monorepo: this benchmark moved under `doc-benchmark/`
-and a new `software-packaging-for-agents/` track holds the framing for shipping
-Intel expert agents (agent_profile + skills + MCP) for runtimes like Claude and
-Hermes. Measurement (this project) is the **gate**, not the product.
+and a new `software-packaging-for-agents/` track holds the framing. The
+deliverable is a **summonable Intel expert** — spawn an expert for a specific
+Intel software *or hardware* product problem, pre-equipped with the skills, MCP
+sources, and setup guide it needs. Measurement (this project) is the **gate**,
+not the product, and a feedback loop keeps each scorecard living.
 
-Framing docs (in `../software-packaging-for-agents/`):
-- `agent-package-format.md` — manifest, two-tier BKM (doc=skill →
-  MCP on demand), evidence-as-credential, per-runtime exporters.
-- `discovery-graph.md` — capability/intent graph + semantic search,
-  ranked by vetted scorecard not popularity (the anti-"trending" design).
+The framing is a closed six-track cycle
+(`../software-packaging-for-agents/architecture.md`):
+**author → build → measure → package → discover → serve**, + feedback. Docs:
+- `authoring.md` — distill skills from docs (benchmark as fitness function) +
+  the executable, sandbox-verified setup-guide artifact.
+- `packaging.md` — manifest (profile + skills + mcp + setup + scorecard),
+  two-tier BKM (doc=skill → MCP on demand), per-runtime exporters.
+- `discovery.md` — capability/intent graph + semantic search, ranked by vetted
+  scorecard not popularity (the anti-"trending" design).
+- `serving.md` — spawn a problem-scoped expert; graph as a fleet router; telemetry.
+- `feedback.md` — telemetry + freshness re-score the scorecard (living credential).
 
 Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):
 - **#58a — Agent-package builder.** Serialize `treatments/base.py` `AgentConfig`
@@ -28,6 +36,14 @@ Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):
   fixtures into one capability graph; fit-based + scorecard ranking.
 - **#58d — Eval-scorecard-as-credential.** Wire `report/arms_report.py` output
   into the package manifest as the shipped, gating credential.
+- **#58e — Skill distillation pipeline.** Doc→SKILL.md draft → score via
+  `skill:`/`skill-agent:` arms → refine until the delta plateaus (authoring track).
+- **#58f — Setup-guide artifact.** Executable env bootstrap verified on the
+  terminal-bench track (Docker, `--network none`); first-class manifest field.
+- **#58g — Serve / spawn-an-expert.** Deserialize a manifest → `AgentConfig` →
+  `eval/agent_runner.py`; problem-scoped spawn; graph as router.
+- **#58h — Feedback loop.** Telemetry → new golden questions → re-score;
+  `freshness_lite` marks scorecards stale → CI re-evaluation.
 
 First proof package: `concise_expert` profile + `onetbb-quickstart` skill +
 Context7 MCP for oneTBB — built entirely from existing fixtures.
