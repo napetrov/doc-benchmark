@@ -70,8 +70,10 @@ can ship.
 Agent profiles (the persona system prompts) are short and high-leverage; they can
 be authored per scope (per library, per hardware platform, per problem class) and
 A/B'd as profile arms (`profile:`) against one another. The authoring track keeps
-a small library of profile templates (concise-expert, accuracy-first,
-setup-and-tune) that the build track composes with skills and MCP.
+a small library of profile templates (e.g. a concise code-first expert, a
+setup-and-tune specialist) that the build track composes with skills and MCP;
+which templates exist is driven by what the [benchmark](../doc-benchmark/) and
+real [feedback](feedback.md) show works, not fixed up front.
 
 ## 5. Human-in-the-loop
 

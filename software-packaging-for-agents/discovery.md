@@ -24,6 +24,10 @@ oneDAL, oneCCL, IPP — would sit permanently below the fold of a popularity-ran
 list. An agent searching by keyword or browsing "trending" will never reach
 them. **Discovery cannot be popularity-based; it must be fit-based.**
 
+> Numerical accuracy recurs here only as the sharpest *illustration* of
+> valuable-but-un-trendy expertise — it motivates why ranking must be fit-based,
+> not a capability this project commits to building or benchmarking.
+
 ## 2. The approach: a capability/intent graph with semantic search
 
 Replace "what's trending" with "what *fits* this need." Two ingredients:
