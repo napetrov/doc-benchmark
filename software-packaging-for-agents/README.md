@@ -35,6 +35,35 @@ always-available skill that knows when to reach for a thick doc source. The
 [benchmark](../doc-benchmark/) is the gate that makes the expert *vetted, not
 merely listed*.
 
+## Prior art: Intel skills already shipping
+
+The skills artifact is not hypothetical — Intel already publishes skill
+collections in the open [Agent Skills](https://github.com/intel/intel-performance-skills)
+format. [`intel/intel-performance-skills`](https://github.com/intel/intel-performance-skills)
+(among others) is a seed-shaped **Intel-aware optimization expert**: three
+composable `SKILL.md` skills — `linux-perf` (profile with `perf`) hands off to
+`performance-patterns` (a fix playbook: serial accumulators, narrow SIMD, missing
+`vzeroupper`/`restrict`, false sharing, …), which can auto-invoke
+`phoronix-test-suite`. It targets x86/AVX2/AVX-512, installs cross-runtime
+(Claude Code, Copilot, Codex, Gemini CLI) via `gh skill install`, and triggers on
+natural phrases like "why is this slow."
+
+It validates three things this project builds on:
+
+- **The artifact and format are real** — composable `SKILL.md` skills following an
+  open standard, exactly our skills layer.
+- **Cross-runtime distribution already works** — strong evidence that an Agent
+  Skills exporter is the natural *first* target (see [`packaging.md`](packaging.md)
+  §5, per-runtime exporters).
+- **Skill composition / hand-off** — one skill delegating to another, the seed of
+  the [serve-track router](serving.md).
+
+What it does *not* yet carry is the rest of our cycle: a benchmarked **scorecard**,
+a problem-scoped **persona**, on-demand **MCP** doc retrieval, a verified
+**setup-guide**, and **discovery** by fit. Those are what turn a shipped skill
+collection into a *summonable, vetted expert*. Such repos are seeds for the
+[author](authoring.md) and [serve](serving.md) tracks, not a replacement for them.
+
 ## Contents
 
 The project is a closed cycle of six tracks (see [`architecture.md`](architecture.md)):

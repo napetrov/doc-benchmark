@@ -40,6 +40,9 @@ Sub-epics (code, deferred to follow-up PRs pending open questions Q3–Q6):
   into the package manifest as the shipped, gating credential.
 - **#58e — Skill distillation pipeline.** Doc→SKILL.md draft → score via
   `skill:`/`skill-agent:` arms → refine until the delta plateaus (authoring track).
+  Also **ingest existing Intel skill repos** (e.g. `intel/intel-performance-skills`)
+  as seed drafts + quality bar; score them and attach a scorecard so an
+  already-shipping skill enters the cycle as a vetted, discoverable package.
 - **#58f — Setup-guide artifact.** Executable env bootstrap verified on the
   terminal-bench track (Docker, `--network none`); first-class manifest field.
 - **#58g — Serve / spawn-an-expert.** Deserialize a manifest → `AgentConfig` →

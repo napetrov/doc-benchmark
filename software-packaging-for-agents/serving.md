@@ -34,8 +34,16 @@ The catalog is not limited to oneAPI libraries. An Intel expert may be scoped to
 |---|---|---|
 | **Software library** | oneTBB parallelism expert | API idioms, BKMs, pitfalls |
 | **Numerical/accuracy** | oneMKL accuracy expert | fp reproducibility, conditioning, determinism flags |
+| **Performance / optimization** | x86 perf-tuning expert (seed: [`intel/intel-performance-skills`](https://github.com/intel/intel-performance-skills)) | `perf` profiling, SIMD/AVX patterns, false sharing, fix playbooks |
 | **Hardware platform** | Gaudi / Xeon-AMX / GPU-Max expert | hardware detection, tuning knobs, env config, known-good toolchains |
 | **Cross-cutting problem** | "why is my HPC run non-deterministic?" | routes across several products (see §4) |
+
+The optimization-expert row is not hypothetical: `intel/intel-performance-skills`
+is a shipping, seed-shaped version of exactly that expert (composable `linux-perf`
+→ `performance-patterns` → `phoronix-test-suite` skills). The serve track's job is
+to wrap such a skill set in a problem-scoped persona, the right MCP sources, and a
+[scorecard](packaging.md) so it can be *spawned by fit* rather than installed by
+hand. Its skill-to-skill hand-off is also a concrete seed for the §4 router.
 
 Hardware experts lean heavily on the **setup-guide** artifact (see
 [`authoring.md`](authoring.md)): the expert's job is often to produce a

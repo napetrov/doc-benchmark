@@ -149,6 +149,12 @@ The manifest is runtime-neutral. Distribution happens through thin **adapters**
 that translate it into each runtime's native layout. The manifest is the single
 source of truth; adapters never add capability, only repackage it.
 
+The **Agent Skills** target is the natural first exporter, and there is
+real-world evidence it pays off: [`intel/intel-performance-skills`](https://github.com/intel/intel-performance-skills)
+already distributes `SKILL.md` skills cross-runtime (Claude Code, Copilot, Codex,
+Gemini CLI) via `gh skill install` from a single layout. One exporter, many
+runtimes — so Agent Skills is the recommended first exporter target.
+
 | Target | What the adapter emits | Notes |
 |---|---|---|
 | **Anthropic Agent Skills** | the `skills/` tree as-is + the profile as a system prompt | Closest to native; `SKILL.md` already conforms. Align with [intel/intel-performance-skills](https://github.com/intel/intel-performance-skills) layout (open question Q5). |

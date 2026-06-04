@@ -16,6 +16,16 @@ plus the hardware platforms (Gaudi, Xeon/AMX, GPU Max, NPUs). Hand-authoring doe
 not scale to that. Authoring must become a **pipeline**, with the benchmark as
 its fitness function.
 
+**Existing Intel skills are seeds, not noise.** Intel already publishes
+hand-crafted skill collections in the Agent Skills format — e.g.
+[`intel/intel-performance-skills`](https://github.com/intel/intel-performance-skills)
+(`linux-perf` → `performance-patterns` → `phoronix-test-suite`). These are
+high-quality, human-authored seeds: the authoring pipeline should **ingest** them
+(as starting drafts and as the quality bar a distilled skill must match), score
+them through the same arms as any other skill, and attach a [scorecard](packaging.md)
+so an already-shipping skill enters the cycle as a vetted, discoverable package.
+The pipeline augments expert authoring; it does not replace it.
+
 ## 2. Doc → skill distillation
 
 Produce a candidate Tier-1 `SKILL.md` automatically, then *prove and refine* it:
