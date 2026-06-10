@@ -37,3 +37,7 @@ current status.
 - [decisions/2026-05-29-evaluating-mcp-skills-personas.md](decisions/2026-05-29-evaluating-mcp-skills-personas.md)
   — assessment + proposal for evaluating MCP docs, skills, and agent persona
   prompts as first-class treatment arms.
+- [decisions/2026-06-10-evaluation-beyond-mcp-docs.md](decisions/2026-06-10-evaluation-beyond-mcp-docs.md)
+  — proposal to make skills/profiles/bundles first-class evaluation *subjects*,
+  add base model × harness as a swept dimension, and pair every project's
+  question set with an executable task set (awareness *and* work).
