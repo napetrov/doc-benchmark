@@ -66,6 +66,11 @@ thin adapter that invokes Harbor (`harbor run -p <task> -a <agent> -m <model>`),
 parses `/logs/verifier/reward.txt`, and returns pass-rate so a *task outcome*
 becomes a first-class arm outcome alongside judge scores.
 
+> **Naming:** bare **`terminal-bench`** refers to the harness *family* (the
+> adapter); **`terminal-bench:<agent>`** is a concrete instance pinned to one
+> Harbor agent (e.g. `terminal-bench:terminus`). Other ADRs and BACKLOG #59 use
+> the bare form when the specific agent is immaterial.
+
 ### 3.2 Model axis
 
 `llm.py` already threads a model through; most result rows already carry the

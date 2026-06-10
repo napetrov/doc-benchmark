@@ -28,9 +28,10 @@ That substrate is right, but it is still organized around **documentation as the
 thing under test**, on **one implicit model and harness**, with **awareness
 measured everywhere and work measured almost nowhere**. Three structural gaps
 follow, and each is large enough — in design surface, in data-model impact, and
-in the open questions it raises — to deserve its own decision record rather than
-a shared section. Bundling them, as the first draft of this file did, hides the
-distinct trade-offs reviewers need to weigh independently.
+in the open questions it raises — to warrant its own decision record. A single
+shared section would obscure the distinct trade-offs reviewers must weigh
+independently, which is why this file is an index rather than one combined
+proposal.
 
 ## 2. The three decisions
 

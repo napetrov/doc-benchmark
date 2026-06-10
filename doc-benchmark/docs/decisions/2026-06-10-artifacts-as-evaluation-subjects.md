@@ -133,6 +133,11 @@ provenance to be reproducible and, later, signable (#58i):
 `report/subject_report.py` renders this; #58d embeds it into the package
 manifest as the gating credential; #58i adds the signature.
 
+The fields are **illustrative**, not a frozen schema. In particular the `ci95`
+interval presupposes the bootstrap-CI question still open in the
+[model × harness ADR](2026-06-10-model-harness-dimension.md) O4 — whether deltas
+carry confidence intervals by default is decided there, not here.
+
 ### 3.5 Relationship to the packaging manifest (#58)
 
 A `bundle` subject and a `package.yaml` manifest describe nearly the same set of

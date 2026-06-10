@@ -66,6 +66,12 @@ oneTBB:
 `coverage_status` is the honest self-report: `questions-only` is a *visible TODO*,
 not a silent default. A product may be `planned` (neither yet) during onboarding.
 
+The flat top-level product map above is **illustrative only** — it does not
+imply the real schema. `config/products.yaml` and `libraries.yaml` have distinct
+existing shapes and are drift-checked against each other (#57 P2); which file
+actually owns the `questions` / `tasks` / `coverage_status` fields is deliberately
+left to open question O4 below.
+
 ### 3.2 The coverage matrix
 
 Extend `terminal-bench-tasks/COVERAGE.md` from a oneTBB API/concept matrix into a
