@@ -16,29 +16,34 @@ tasks they usually dominate the doc/skill delta); and so that **every project
 carries both a question set (awareness) and a task set (work)**, not questions
 alone.
 
-Assessment + phasing in
-[docs/decisions/2026-06-10-evaluation-beyond-mcp-docs.md](docs/decisions/2026-06-10-evaluation-beyond-mcp-docs.md).
-Builds directly on the `treatments/` framework, `eval/arm_runner.py`, the
+Motivation, composition, and rollout order in the umbrella index
+[docs/decisions/2026-06-10-evaluation-beyond-mcp-docs.md](docs/decisions/2026-06-10-evaluation-beyond-mcp-docs.md);
+each phase is its own ADR (detailed design, alternatives, consequences, open
+questions). Builds on the `treatments/` framework, `eval/arm_runner.py`, the
 terminal-bench track, and feeds the packaging scorecard (#58d/#58i).
 
 Phases (each independently shippable; existing `arms run` / two-arm doc flow stay
 working):
-- **Phase A — Coverage contract.** Product × {questions, tasks} matrix in
-  `terminal-bench-tasks/COVERAGE.md`; dashboard gains awareness vs work columns;
-  per-product contract declared in config. Makes "text-only" products a visible
-  TODO. No new eval machinery.
-- **Phase B — Model × harness dimension.** Promote answer model to a reported
-  axis; name + record the harness (`single-shot` / `agent` / `terminal-bench`);
-  `matrix:` config block + `(model, harness)` key through `arm_runner`, report,
-  dashboard; a `terminal-bench` harness adapter so task pass-rate is an arm
-  outcome. Cost-gated.
-- **Phase C — Subjects.** `subjects/` descriptor + loader, `cli.py subjects run`
-  wrapping `arm_runner` + the task adapter, `report/subject_report.py`, and a
-  versioned per-subject scorecard schema — the object #58d/#58i serialize/sign.
+- **Phase A — Coverage contract**
+  ([ADR](docs/decisions/2026-06-10-questions-and-tasks-coverage-contract.md)).
+  Per-product contract in config + a product × {questions, tasks} matrix in
+  `terminal-bench-tasks/COVERAGE.md`; dashboard gains awareness vs work columns.
+  Makes "text-only" products a visible TODO. No new eval machinery.
+- **Phase B — Model × harness dimension**
+  ([ADR](docs/decisions/2026-06-10-model-harness-dimension.md)). Promote answer
+  model to a reported axis; name + record the harness (`single-shot` / `agent` /
+  `terminal-bench:<agent>`); `matrix:` config block + `(model, harness)` key
+  through `arm_runner`, report, dashboard; a `terminal-bench` harness adapter so
+  task pass-rate is an arm outcome. Cost-gated, single-cell default.
+- **Phase C — Subjects**
+  ([ADR](docs/decisions/2026-06-10-artifacts-as-evaluation-subjects.md)).
+  `subjects/` descriptor + loader, `cli.py subjects run` wrapping `arm_runner` +
+  the task adapter, `report/subject_report.py`, and a versioned per-subject
+  scorecard schema — the object #58d/#58i serialize/sign.
 
-Open decisions (see §7 of the decision record): harness invocation boundary,
+Each ADR carries its own open questions (harness invocation boundary,
 subject-vs-package overlap, default matrix size, soft vs hard coverage
-enforcement.
+enforcement, …).
 
 ---
 

@@ -38,6 +38,14 @@ current status.
   — assessment + proposal for evaluating MCP docs, skills, and agent persona
   prompts as first-class treatment arms.
 - [decisions/2026-06-10-evaluation-beyond-mcp-docs.md](decisions/2026-06-10-evaluation-beyond-mcp-docs.md)
-  — proposal to make skills/profiles/bundles first-class evaluation *subjects*,
-  add base model × harness as a swept dimension, and pair every project's
-  question set with an executable task set (awareness *and* work).
+  — **umbrella / index** for extending evaluation beyond MCP docs; states the
+  shared motivation and sequences the three ADRs below.
+  - [decisions/2026-06-10-questions-and-tasks-coverage-contract.md](decisions/2026-06-10-questions-and-tasks-coverage-contract.md)
+    — pair every project's question set (awareness) with an executable task set
+    (work); surface the gap as a checked matrix. *(Phase A.)*
+  - [decisions/2026-06-10-model-harness-dimension.md](decisions/2026-06-10-model-harness-dimension.md)
+    — make base model × harness an explicit, swept, reported dimension; deltas
+    only comparable within a `(model, harness)` cell. *(Phase B.)*
+  - [decisions/2026-06-10-artifacts-as-evaluation-subjects.md](decisions/2026-06-10-artifacts-as-evaluation-subjects.md)
+    — promote skills/profiles/bundles from arms to first-class evaluation
+    *subjects* emitting a per-subject scorecard. *(Phase C.)*
