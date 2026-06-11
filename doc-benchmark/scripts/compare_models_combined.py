@@ -32,6 +32,7 @@ from datetime import datetime
 
 try:
     from zoneinfo import ZoneInfo
+
     _TZ = ZoneInfo("America/Los_Angeles")
 except ImportError:
     _TZ = None
@@ -39,29 +40,35 @@ except ImportError:
 
 def run_compare_models(runs: list[str], run_ids: str, temp_out: Path) -> str:
     """Run compare_models.py and return markdown content."""
-    cmd = [
-        sys.executable,
-        "scripts/compare_models.py",
-        "--runs"] + runs + [
-        "--run-ids", run_ids,
-        "--out", str(temp_out)
-    ]
+    cmd = (
+        [sys.executable, "scripts/compare_models.py", "--runs"]
+        + runs
+        + ["--run-ids", run_ids, "--out", str(temp_out)]
+    )
 
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
 
     if result.returncode != 0:
-        print(f"Error running compare_models.py:", file=sys.stderr)
+        print("Error running compare_models.py:", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         sys.exit(1)
 
-    return temp_out.read_text(encoding='utf-8')
+    return temp_out.read_text(encoding="utf-8")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare multiple model runs on regular and/or golden questions")
-    parser.add_argument("--regular-runs", nargs="+", help="Paths to regular questions judged JSON files")
-    parser.add_argument("--golden-runs", nargs="+", help="Paths to golden questions judged JSON files")
-    parser.add_argument("--run-ids", required=True, help="Comma-separated run IDs (e.g., sonnet46,opus48)")
+    parser = argparse.ArgumentParser(
+        description="Compare multiple model runs on regular and/or golden questions"
+    )
+    parser.add_argument(
+        "--regular-runs", nargs="+", help="Paths to regular questions judged JSON files"
+    )
+    parser.add_argument(
+        "--golden-runs", nargs="+", help="Paths to golden questions judged JSON files"
+    )
+    parser.add_argument(
+        "--run-ids", required=True, help="Comma-separated run IDs (e.g., sonnet46,opus48)"
+    )
     parser.add_argument("--out", required=True, help="Output markdown file path")
 
     args = parser.parse_args()
@@ -75,11 +82,17 @@ def main():
 
     # Validate run counts
     if args.regular_runs and len(args.regular_runs) != len(run_ids):
-        print(f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})", file=sys.stderr)
+        print(
+            f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})",
+            file=sys.stderr,
+        )
         return 1
 
     if args.golden_runs and len(args.golden_runs) != len(run_ids):
-        print(f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})", file=sys.stderr)
+        print(
+            f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})",
+            file=sys.stderr,
+        )
         return 1
 
     lines = []
@@ -104,7 +117,9 @@ def main():
 
     # Generate regular section
     if args.regular_runs:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
+        ) as tmp:
             temp_path = Path(tmp.name)
 
         print("Generating regular questions analysis...")
@@ -112,11 +127,11 @@ def main():
         temp_path.unlink()
 
         # Skip header from sub-report
-        regular_lines = regular_content.split('\n')
+        regular_lines = regular_content.split("\n")
         # Find where content starts (after first "##")
         start_idx = 0
         for i, line in enumerate(regular_lines):
-            if line.strip().startswith('##') and 'Models Compared' in line:
+            if line.strip().startswith("##") and "Models Compared" in line:
                 start_idx = i
                 break
 
@@ -132,7 +147,9 @@ def main():
 
     # Generate golden section
     if args.golden_runs:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
+        ) as tmp:
             temp_path = Path(tmp.name)
 
         print("Generating golden questions analysis...")
@@ -140,10 +157,10 @@ def main():
         temp_path.unlink()
 
         # Skip header from sub-report
-        golden_lines = golden_content.split('\n')
+        golden_lines = golden_content.split("\n")
         start_idx = 0
         for i, line in enumerate(golden_lines):
-            if line.strip().startswith('##') and 'Models Compared' in line:
+            if line.strip().startswith("##") and "Models Compared" in line:
                 start_idx = i
                 break
 

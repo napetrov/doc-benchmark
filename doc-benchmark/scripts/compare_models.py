@@ -33,7 +33,6 @@ Generates a comprehensive report with:
 
 import argparse
 import json
-import math
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +40,7 @@ from typing import Any
 
 try:
     from scipy import stats as sp_stats
+
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
@@ -48,6 +48,7 @@ except ImportError:
 
 try:
     from zoneinfo import ZoneInfo
+
     _TZ = ZoneInfo("America/Los_Angeles")
 except ImportError:
     _TZ = None
@@ -87,16 +88,18 @@ def extract_scores(run_data: dict) -> list[dict]:
                     break
 
             if baseline_score is not None and treatment_score is not None:
-                scores.append({
-                    "question_id": qid,
-                    "question_text": evaluation.get("question_text", ""),
-                    "category": evaluation.get("category", ""),
-                    "difficulty": evaluation.get("difficulty", "unknown"),
-                    "persona": evaluation.get("persona", ""),
-                    "without_docs": baseline_score,
-                    "with_docs": treatment_score,
-                    "delta": treatment_score - baseline_score,
-                })
+                scores.append(
+                    {
+                        "question_id": qid,
+                        "question_text": evaluation.get("question_text", ""),
+                        "category": evaluation.get("category", ""),
+                        "difficulty": evaluation.get("difficulty", "unknown"),
+                        "persona": evaluation.get("persona", ""),
+                        "without_docs": baseline_score,
+                        "with_docs": treatment_score,
+                        "delta": treatment_score - baseline_score,
+                    }
+                )
 
     # Fallback to old format (evaluation inside arms)
     else:
@@ -113,22 +116,26 @@ def extract_scores(run_data: dict) -> list[dict]:
                     treatment_arm = arm_name
                     break
 
-            treatment_eval = arms.get(treatment_arm, {}).get("evaluation", {}) if treatment_arm else {}
+            treatment_eval = (
+                arms.get(treatment_arm, {}).get("evaluation", {}) if treatment_arm else {}
+            )
 
             baseline_score = baseline_eval.get("aggregate_score")
             treatment_score = treatment_eval.get("aggregate_score")
 
             if baseline_score is not None and treatment_score is not None:
-                scores.append({
-                    "question_id": qid,
-                    "question_text": answer.get("question_text", ""),
-                    "category": answer.get("category", ""),
-                    "difficulty": answer.get("difficulty", "unknown"),
-                    "persona": answer.get("persona", ""),
-                    "without_docs": baseline_score,
-                    "with_docs": treatment_score,
-                    "delta": treatment_score - baseline_score,
-                })
+                scores.append(
+                    {
+                        "question_id": qid,
+                        "question_text": answer.get("question_text", ""),
+                        "category": answer.get("category", ""),
+                        "difficulty": answer.get("difficulty", "unknown"),
+                        "persona": answer.get("persona", ""),
+                        "without_docs": baseline_score,
+                        "with_docs": treatment_score,
+                        "delta": treatment_score - baseline_score,
+                    }
+                )
 
     return scores
 
@@ -143,7 +150,7 @@ def significance_test(with_scores: list[float], without_scores: list[float]) -> 
     if len(with_scores) < 5 or not HAS_SCIPY:
         return None
 
-    deltas = [w - wo for w, wo in zip(with_scores, without_scores)]
+    deltas = [w - wo for w, wo in zip(with_scores, without_scores, strict=True)]
     d_mean = sum(deltas) / len(deltas)
     d_std = (sum((x - d_mean) ** 2 for x in deltas) / len(deltas)) ** 0.5
 
@@ -189,7 +196,12 @@ def fmt_delta(d):
     return f"+{d}" if d > 0 else str(d)
 
 
-def generate_combined_report(regular_runs: list[tuple[str, dict]], golden_runs: list[tuple[str, dict]], run_ids: list[str], out_path: str):
+def generate_combined_report(
+    regular_runs: list[tuple[str, dict]],
+    golden_runs: list[tuple[str, dict]],
+    run_ids: list[str],
+    out_path: str,
+):
     """Generate combined report for regular and/or golden questions."""
 
     lines = []
@@ -250,7 +262,9 @@ def generate_combined_report(regular_runs: list[tuple[str, dict]], golden_runs: 
     print(f"✅ Report written to {out_path}")
 
 
-def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], section_name: str) -> list[str]:
+def generate_section_report(
+    runs: list[tuple[str, dict]], run_ids: list[str], section_name: str
+) -> list[str]:
     """Generate report section for a set of runs (regular or golden)."""
     """Generate multi-model comparison report."""
 
@@ -280,7 +294,7 @@ def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], se
         provider = run_data.get("provider", "unknown")
         judge_model = run_data.get("judge_model", "same")
         judge_provider = run_data.get("judge_provider", provider)
-        lines.append(f'| **{run_id}** | {model} ({provider}) | {judge_model} ({judge_provider}) |')
+        lines.append(f"| **{run_id}** | {model} ({provider}) | {judge_model} ({judge_provider}) |")
 
     lines += [
         "",
@@ -314,8 +328,8 @@ def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], se
         }
 
         lines.append(
-            f'| **{run_id}** | {len(scores)} | {with_avg} | {without_avg} | '
-            f'**{fmt_delta(delta_avg)}** | {improved} | {degraded} |'
+            f"| **{run_id}** | {len(scores)} | {with_avg} | {without_avg} | "
+            f"**{fmt_delta(delta_avg)}** | {improved} | {degraded} |"
         )
 
     lines += [""]
@@ -340,8 +354,8 @@ def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], se
                 sig_mark = "✅ Yes" if sig["significant"] else "❌ No"
                 p_wilcox = sig["p_wilcoxon"] if sig["p_wilcoxon"] else "N/A"
                 lines.append(
-                    f'| **{run_id}** | {fmt_delta(sig["delta_mean"])} | {sig["p_ttest"]} | '
-                    f'{p_wilcox} | {fmt_delta(sig["cohens_d"])} | {sig["effect"]} | {sig_mark} |'
+                    f"| **{run_id}** | {fmt_delta(sig['delta_mean'])} | {sig['p_ttest']} | "
+                    f"{p_wilcox} | {fmt_delta(sig['cohens_d'])} | {sig['effect']} | {sig_mark} |"
                 )
 
         lines += [""]
@@ -374,13 +388,17 @@ def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], se
                 with_avg = avg([s["with_docs"] for s in static])
                 without_avg = avg([s["without_docs"] for s in static])
                 delta = round(with_avg - without_avg, 1)
-                lines.append(f'| **{run_id}** | 🔵 static | {len(static)} | {with_avg} | {without_avg} | **{fmt_delta(delta)}** |')
+                lines.append(
+                    f"| **{run_id}** | 🔵 static | {len(static)} | {with_avg} | {without_avg} | **{fmt_delta(delta)}** |"
+                )
 
             if dynamic:
                 with_avg = avg([s["with_docs"] for s in dynamic])
                 without_avg = avg([s["without_docs"] for s in dynamic])
                 delta = round(with_avg - without_avg, 1)
-                lines.append(f'| **{run_id}** | 🟡 dynamic | {len(dynamic)} | {with_avg} | {without_avg} | **{fmt_delta(delta)}** |')
+                lines.append(
+                    f"| **{run_id}** | 🟡 dynamic | {len(dynamic)} | {with_avg} | {without_avg} | **{fmt_delta(delta)}** |"
+                )
 
         lines += [""]
 
@@ -483,8 +501,8 @@ def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], se
         hurt_pct = round(100 * hurt / n) if n > 0 else 0
 
         lines.append(
-            f'| **{run_id}** | **{fmt_delta(stats["delta_avg"])}** | '
-            f'{helped} ({helped_pct}%) | {hurt} ({hurt_pct}%) |'
+            f"| **{run_id}** | **{fmt_delta(stats['delta_avg'])}** | "
+            f"{helped} ({helped_pct}%) | {hurt} ({hurt_pct}%) |"
         )
 
     lines += [""]
@@ -520,9 +538,15 @@ def generate_section_report(runs: list[tuple[str, dict]], run_ids: list[str], se
 
 def main():
     parser = argparse.ArgumentParser(description="Compare multiple model runs")
-    parser.add_argument("--regular-runs", nargs="+", help="Paths to regular questions judged JSON files")
-    parser.add_argument("--golden-runs", nargs="+", help="Paths to golden questions judged JSON files")
-    parser.add_argument("--run-ids", required=True, help="Comma-separated run IDs (e.g., sonnet46,opus48)")
+    parser.add_argument(
+        "--regular-runs", nargs="+", help="Paths to regular questions judged JSON files"
+    )
+    parser.add_argument(
+        "--golden-runs", nargs="+", help="Paths to golden questions judged JSON files"
+    )
+    parser.add_argument(
+        "--run-ids", required=True, help="Comma-separated run IDs (e.g., sonnet46,opus48)"
+    )
     parser.add_argument("--out", required=True, help="Output markdown file path")
 
     args = parser.parse_args()
@@ -536,17 +560,21 @@ def main():
 
     # Validate run counts
     if args.regular_runs and len(args.regular_runs) != len(run_ids):
-        print(f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})")
+        print(
+            f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})"
+        )
         return 1
 
     if args.golden_runs and len(args.golden_runs) != len(run_ids):
-        print(f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})")
+        print(
+            f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})"
+        )
         return 1
 
     # Load regular runs if provided
     regular_runs = []
     if args.regular_runs:
-        for run_id, run_path in zip(run_ids, args.regular_runs):
+        for run_id, run_path in zip(run_ids, args.regular_runs, strict=True):
             print(f"Loading {run_id} (regular): {run_path}")
             run_data = load_run(run_path)
             regular_runs.append((run_id, run_data))
@@ -554,7 +582,7 @@ def main():
     # Load golden runs if provided
     golden_runs = []
     if args.golden_runs:
-        for run_id, run_path in zip(run_ids, args.golden_runs):
+        for run_id, run_path in zip(run_ids, args.golden_runs, strict=True):
             print(f"Loading {run_id} (golden): {run_path}")
             run_data = load_run(run_path)
             golden_runs.append((run_id, run_data))
