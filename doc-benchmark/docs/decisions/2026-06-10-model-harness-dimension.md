@@ -1,6 +1,6 @@
 # ADR: Base model × harness as an evaluation dimension
 
-**Status:** PROPOSED. One of three decisions under the
+**Status:** PROPOSED. One of four decisions under the
 [evaluation-beyond-MCP-docs umbrella](2026-06-10-evaluation-beyond-mcp-docs.md)
 (BACKLOG #59). Builds on `doc_benchmarks/llm.py`, `eval/arm_runner.py`,
 `eval/agent_runner.py`, and the terminal-bench track.

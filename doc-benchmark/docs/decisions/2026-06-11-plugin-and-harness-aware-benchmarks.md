@@ -10,7 +10,7 @@ software-packaging track's `AgentConfig` package shape.
 
 **Date:** 2026-06-11
 
-**Phase:** D in the umbrella rollout. Land after the model x harness matrix
+**Phase:** C in the umbrella rollout. Land after the model x harness matrix
 exists, or as an explicit extension while implementing it.
 
 ---
@@ -118,6 +118,12 @@ matrix:
       harness: single-shot
       plugins: []
 
+    - id: gpt52_openclaw_none
+      model: gpt-5.2
+      provider: openai
+      harness: openclaw-agent
+      plugins: []
+
     - id: gpt52_openclaw_caveman
       model: gpt-5.2
       provider: openai
@@ -144,31 +150,48 @@ matrix:
 The old `models:` + `harnesses:` shorthand remains valid and expands to cells
 with `plugins: []`.
 
+Every plugin-effect report needs paired cells. For example,
+`gpt52_openclaw_caveman` can be compared to `gpt52_openclaw_none`, not to
+`gpt52_single_shot`, because the latter changes the harness at the same time as
+the plugin set.
+
 ### 3.3 Plugin sets
 
-Use a named `plugin_set` in result rows:
+Use both a human-readable plugin-set label and a canonical plugin-set id in
+result rows. The id is a digest over the ordered plugin refs, resolved
+versions/code identities, kinds, and normalized config. Reports aggregate by the
+canonical id and display the label for readability.
 
 ```jsonc
 {
   "model": "gpt-5.2",
   "harness": "openclaw-agent",
-  "plugin_set": "caveman",
+  "plugin_set": "caveman-terse",
+  "plugin_set_id": "sha256:...",
   "plugins": [
     {"id": "caveman", "version": "0.1.0", "kind": "output_shaper", "config_hash": "sha256:..."}
   ],
   "arm": "skill:onetbb-quickstart",
   "metrics": {
     "judge_aggregate": 82.0,
-    "prompt_tokens": 1200,
-    "completion_tokens": 180,
-    "answer_chars": 740,
+    "billed_prompt_tokens": 1200,
+    "billed_completion_tokens": 260,
+    "raw_model_completion_tokens": 260,
+    "raw_model_answer_chars": 1100,
+    "final_answer_tokens": 180,
+    "final_answer_chars": 740,
+    "model_elapsed_sec": 3.8,
+    "plugin_elapsed_sec": 0.4,
     "elapsed_sec": 4.2
   }
 }
 ```
 
-An empty plugin set is still a named cell (`plugin_set: none`) so baseline
-comparisons are explicit.
+An empty plugin set is still a named cell (`plugin_set: none`) with a canonical
+empty-set id, so baseline comparisons are explicit. For output shapers, storing
+both raw model output metrics and final answer metrics is required; otherwise a
+plugin can appear to reduce billed tokens when it only shortened the text after
+the model had already produced it.
 
 ### 3.4 How plugin effects are computed
 
@@ -182,10 +205,18 @@ plugin_delta    = score(arm, model, harness, caveman)
                 - score(arm, model, harness, none)
 ```
 
+Plugin deltas are paired by question/task, arm, model, harness, judge model,
+generation parameters, retry budget, and cache policy. Runs should be repeated
+when the harness is stochastic, and cell order should be interleaved or
+randomized so service latency, warm caches, or transient provider behavior do
+not masquerade as a plugin effect. Reports should show confidence intervals or
+at least run counts whenever repeated trials are available.
+
 For Caveman-style output reduction, reports should show:
 
-- `completion_tokens_delta_pct`
-- `answer_chars_delta_pct`
+- `billed_completion_tokens_delta_pct`
+- `final_answer_chars_delta_pct`
+- `raw_to_final_chars_delta_pct`
 - `judge_aggregate_delta`
 - `completeness_delta` when the judge dimensions include completeness
 - `task_pass_rate_delta` for terminal-bench cells
@@ -198,7 +229,7 @@ or task-success trade-off under the target harness.
 
 Add a harness abstraction before adding many plugins:
 
-```python
+```text
 class Harness(Protocol):
     id: str
     def run(self, *, model, provider, agent_config, plugins, task_or_question) -> RunCellResult: ...
@@ -250,12 +281,17 @@ coerced into a different behavior.
    - Render both treatment deltas and plugin deltas.
    - Add a Caveman-oriented section: token/character reduction vs score and
      pass-rate tax.
+   - Separate billed/raw model metrics from final post-plugin metrics.
    - Add guardrails that warn when a report compares cells with different
      harnesses, models, judge models, or plugin sets as if they were the same.
 
 6. **Validation and tests**
    - Unit-test matrix expansion, duplicate cell ids, unsupported
      plugin/harness combinations, and no-cross-cell-delta behavior.
+   - Test that plugin deltas require paired no-plugin cells with the same model
+     and harness.
+   - Test that plugin-set ids change when plugin order, version, code identity,
+     or normalized config changes.
    - Add a fake output-shaper plugin in tests to prove token/length metrics and
      quality trade-off reporting work without depending on a real Caveman
      runtime.
