@@ -1,0 +1,131 @@
+# Terminal-Bench Tasks for Intel oneAPI Libraries
+
+This directory contains [Terminal-Bench](https://github.com/laude-institute/terminal-bench) /
+[Harbor](https://github.com/laude-institute/harbor) tasks for evaluating LLM coding agents
+on Intel oneAPI libraries (oneTBB, oneMKL, oneCCL, IPP, etc.).
+
+## Why Terminal-Bench?
+
+Unlike pure Q&A benchmarks, Terminal-Bench tasks require the agent to:
+- Write real C++ / Python code using Intel libraries
+- Compile and run it in an isolated Docker environment
+- Pass automated correctness **and** performance tests
+
+This complements the existing `eval/` Q&A benchmark with **coding-task evaluation**. The same task set can compare a base agent against an agent given extra documentation, reusable skills, a different agent profile, or another context artifact.
+
+## Task Structure
+
+Each task follows the [Harbor task format](https://harborframework.com/docs/tasks):
+
+```text
+terminal-bench-tasks/<task-name>/
+  instruction.md          # Natural-language task description shown to the agent
+  task.toml               # Config: timeouts, Docker image, metadata
+  environment/
+    Dockerfile            # Container with preinstalled libs
+    <seed files>          # Starter code, data files, etc.
+  tests/
+    test.sh               # Entry point: runs pytest, writes /logs/verifier/reward.txt
+    test_*.py             # Pytest test cases
+  solution/
+    solve.sh              # Oracle solution (sanity check, not shown to agent)
+```
+
+## Available Tasks
+
+See [COVERAGE.md](./COVERAGE.md) for the broader oneTBB API/concept coverage matrix and planned gaps.
+
+| Task | Library | Difficulty | What it tests |
+|------|---------|------------|---------------|
+| [onetbb-parallel-sort](./onetbb-parallel-sort/) | oneTBB | medium | `tbb::parallel_sort` on 10M integers; correctness + ≤5s wall time |
+| [onetbb-nstream](./onetbb-nstream/) | oneTBB | medium | ParRes-inspired streaming triad with `parallel_for` + `parallel_reduce` |
+| [onetbb-stencil](./onetbb-stencil/) | oneTBB | medium | ParRes-inspired 2D stencil with tiled `blocked_range2d` parallelism |
+| [onetbb-transpose](./onetbb-transpose/) | oneTBB | medium | ParRes-inspired tiled matrix transpose with `blocked_range2d` |
+| [onetbb-parallel-reduce](./onetbb-parallel-reduce/) | oneTBB | medium | Aggregate sum/sumsq/min/max with `parallel_reduce` |
+| [onetbb-parallel-scan](./onetbb-parallel-scan/) | oneTBB | medium | Inclusive prefix sum with `parallel_scan` |
+| [onetbb-flow-graph](./onetbb-flow-graph/) | oneTBB | medium | Deterministic transform pipeline with `flow::graph` and `function_node` |
+| [onemkl-dgemm](./onemkl-dgemm/) | oneMKL | medium | Dense matrix multiply with `cblas_dgemm`, signature vs serial reference |
+| [onemkl-fft](./onemkl-fft/) | oneMKL | medium | DFTI forward/backward FFT round-trip + spectrum vs naive DFT |
+| [onedpl-transform-reduce](./onedpl-transform-reduce/) | oneDPL | medium | Parallel `transform_reduce` (`par_unseq`) on the oneTBB backend |
+| [ipp-dotprod](./ipp-dotprod/) | IPP | easy | Vector dot product with `ippsDotProd_64f` vs serial reference |
+| [sklearnex-classification](./sklearnex-classification/) | sklearnex | easy | KNN classifier accelerated with `patch_sklearn()`, accuracy vs stock sklearn |
+
+> The oneTBB tasks build entirely from `ubuntu:22.04` + standard apt and are
+> verified in the `terminal-bench-verify` CI job. The oneMKL / oneDPL / IPP /
+> oneCCL / sklearnex tasks pull the Intel oneAPI apt repo, header-only oneDPL,
+> or pip wheels at **build** time (the verifier still runs offline with
+> `--network none`) and are verified in a separate `terminal-bench-verify-oneapi`
+> CI job so a heavy-image build cannot affect the core oneTBB job.
+
+## Running a Task (Harbor)
+
+```bash
+pip install harbor-cli   # or: uv tool install harbor-cli
+
+# Evaluate an agent on a single task
+harbor run \
+  -p terminal-bench-tasks/onetbb-parallel-sort \
+  -a terminus \
+  -m anthropic/claude-opus-4-6
+
+# Use the Oracle agent to sanity-check the solution
+harbor run \
+  -p terminal-bench-tasks/onetbb-parallel-sort \
+  -a oracle
+```
+
+## Provenance
+
+The ParRes-inspired tasks are simplified exercises derived from the ideas in [ParRes/Kernels](https://github.com/ParRes/Kernels), not verbatim copies of upstream source files. See [PROVENANCE.md](./PROVENANCE.md) for details and license notes.
+
+## Docker Images
+
+Tasks use custom Docker images built from `environment/Dockerfile`.
+To build locally:
+
+```bash
+docker build -t intel-hpc-bench/onetbb-parallel-sort:latest \
+  terminal-bench-tasks/onetbb-parallel-sort/environment/
+docker build -t intel-hpc-bench/onetbb-nstream:latest \
+  terminal-bench-tasks/onetbb-nstream/environment/
+
+# oneAPI-component tasks pull large dependencies at build time:
+docker build -t intel-hpc-bench/onemkl-dgemm:latest \
+  terminal-bench-tasks/onemkl-dgemm/environment/
+docker build -t intel-hpc-bench/sklearnex-classification:latest \
+  terminal-bench-tasks/sklearnex-classification/environment/
+```
+
+## Adding New Tasks
+
+1. Pick an API/concept gap from [COVERAGE.md](./COVERAGE.md).
+2. Copy an existing task folder as a template.
+3. Update `instruction.md`, `task.toml`, `environment/Dockerfile`, and starter sources.
+4. Write tests in `tests/test_*.py` — they must write `1` or `0` to `/logs/verifier/reward.txt` via `tests/test.sh`.
+5. Add a deterministic oracle solution in `solution/solve.sh`.
+6. Build the Docker image and smoke-test the oracle verifier offline with `--network none`.
+7. Add a row to the table above and update the coverage matrix.
+
+## Roadmap
+
+Done:
+
+- [x] `onetbb-parallel-reduce` — aggregate with `tbb::parallel_reduce`
+- [x] `onetbb-flow-graph` — transform pipeline with `tbb::flow::graph`
+- [x] `onemkl-dgemm` — matrix multiply via `cblas_dgemm`
+- [x] `onemkl-fft` — FFT round-trip via DFTI
+- [x] `onedpl-transform-reduce` — parallel STL `transform_reduce`
+- [x] `ipp-dotprod` — signal-processing dot product via `ippsDotProd_64f`
+- [x] `sklearnex-classification` — accelerated scikit-learn workflow
+
+Next candidates (see [COVERAGE.md](./COVERAGE.md) for the full plan + validation
+strategies):
+
+- [ ] `onemkl-rng` — reproducible random number generation via the MKL VSL/RNG API
+- [ ] `onednn-gemm` or `onednn-relu` — a single oneDNN primitive vs a serial reference
+- [ ] `ipp-image-resize` — image resize with `ippiResize`, verify pixel accuracy
+- [ ] `ippcp-aes` — AES round-trip with IPP Cryptography
+- [ ] `openmp-reduce` — OpenMP parallel reduction (offline, stock `-fopenmp`)
+- [ ] `onedpl-sort` — `oneapi::dpl::sort` with a parallel policy
+- [ ] `oneccl-allreduce` — multi-process allreduce with oneCCL + MPI (needs
+      real-image iteration: MPI/oneCCL transport under `--network none`)
