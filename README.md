@@ -1,9 +1,14 @@
 # doc-benchmark
 
-`doc-benchmark` is a toolkit for measuring and improving technical documentation quality. It supports two complementary workflows:
+`doc-benchmark` is a toolkit for measuring whether documentation and other agent-facing context improve model performance. It started as a technical documentation quality benchmark and now supports a broader evaluation pattern: compare a model or coding agent with and without a controlled context layer.
+
+Current context layers include product documentation, local Markdown/URL sources, Context7-backed docs, curated golden question sets, and executable task environments. The same harness can be extended to evaluate skills, agent profiles, prompt packs, retrieval settings, and other artifacts that may affect agent behavior.
+
+It supports three complementary workflows:
 
 1. **Static documentation quality checks** over Markdown/code examples: coverage, freshness, readability, example execution, gates, and regression detection.
-2. **LLM-assisted product documentation evaluation**: persona and question generation, answer generation with/without documentation context, LLM-as-judge scoring, multi-judge panels, RAGAS meta-evaluation, dashboards, and executable terminal-bench-style tasks.
+2. **LLM-assisted context evaluation**: persona and question generation, answer generation with/without context, LLM-as-judge scoring, multi-judge panels, RAGAS meta-evaluation, trust gates, baselines, dashboards, and reproducibility metadata.
+3. **Executable agent tasks**: Terminal-Bench/Harbor-style tasks that require an agent to edit code, compile, run, and pass correctness/performance verifiers.
 
 The repository is currently focused on Intel library documentation quality experiments, especially oneTBB, oneDAL, and oneMKL.
 
@@ -92,26 +97,44 @@ Weights are normalized across enabled metrics. The benchmark also supports soft 
 
 The LLM workflow is designed to answer a practical question: does documentation improve model answers for real developer tasks?
 
-A typical flow is:
+A typical one-command flow is:
 
 ```bash
-python cli.py personas discover ...
-python cli.py questions generate ...
-python cli.py questions refine ...
-python cli.py answers generate ...
-python cli.py eval score ...
-python cli.py eval panel-score ...
-python cli.py eval ragas ...
-python cli.py dashboard generate ...
+python cli.py benchmark run \
+  --library onetbb \
+  --model gpt-4o-mini \
+  --judge-model claude-sonnet-4 \
+  --judge-provider anthropic \
+  --multi-run 3
+```
+
+The pipeline:
+
+1. Discovers or loads user personas for the target product.
+2. Generates or reuses questions from persona/topic signals, golden sets, and optionally doc chunks.
+3. Generates two answers per question using the same answer model:
+   - `with_docs`: retrieve context from the configured doc source, rerank it, then answer using only that context.
+   - `without_docs`: answer from the model's parametric knowledge only.
+4. Evaluates both answers with a separate judge model and reports the delta.
+5. Writes artifacts under `results/<library>/` and includes `question_set_hash`, model metadata, token usage, retrieval metadata when requested, and trust-gate signals.
+
+For fair multi-model comparisons, generate one question set and reuse it:
+
+```bash
+python cli.py benchmark run --library onedal --output-dir results/onedal_seed
+python cli.py benchmark run --library onedal --questions-from results/onedal_seed --model gpt-4o
+python cli.py benchmark run --library onedal --questions-from results/onedal_seed --model claude-sonnet-4 --provider anthropic
 ```
 
 Generated artifacts should normally go under `results/`, `reports/`, or `baselines/current.json` for temporary runs; those paths are ignored by default. Curated fixtures under `answers/`, `eval/`, `baselines/`, `personas/`, and `questions/` may be committed intentionally when they are part of a reproducible benchmark.
 
+See [docs/benchmark-methodology.md](docs/benchmark-methodology.md) for the detailed model roles, question types, difficulty levels, task workflow, and trust checks.
+
 ## Executable oneTBB tasks
 
-The repository includes terminal-bench-style tasks under `terminal-bench-tasks/`. These tasks validate not just text answers but working code and measurable behavior. Current CI verifies oracle solutions for the included oneTBB task.
+The repository includes terminal-bench-style tasks under `terminal-bench-tasks/`. These tasks validate not just text answers but working code and measurable behavior. Current CI builds every included oneTBB task container and verifies the oracle solution with network disabled.
 
-Planned next work is to derive additional oneTBB executable tasks from [ParRes/Kernels](https://github.com/ParRes/Kernels), with provenance/license checks before adapting code. Good first candidates are `nstream`, `stencil`, `transpose`, `sparse`, and shared-memory adaptations of `p2p` patterns.
+Included oneTBB tasks cover `parallel_sort`, `parallel_for`/`parallel_reduce` streaming kernels, tiled stencil and transpose, `parallel_reduce`, `parallel_scan`, and `flow::graph`. These tasks are the executable side of the benchmark: they can test whether docs, skills, or an agent profile actually improve an agent's ability to produce correct and performant code.
 
 ## Repository layout
 

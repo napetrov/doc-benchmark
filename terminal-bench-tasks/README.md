@@ -11,7 +11,7 @@ Unlike pure Q&A benchmarks, Terminal-Bench tasks require the agent to:
 - Compile and run it in an isolated Docker environment
 - Pass automated correctness **and** performance tests
 
-This complements the existing `eval/` Q&A benchmark with **coding-task evaluation**.
+This complements the existing `eval/` Q&A benchmark with **coding-task evaluation**. The same task set can compare a base agent against an agent given extra documentation, reusable skills, a different agent profile, or another context artifact.
 
 ## Task Structure
 
@@ -90,8 +90,9 @@ docker build -t intel-hpc-bench/onetbb-nstream:latest \
 
 ## Roadmap
 
-- [ ] `onetbb-parallel-reduce` — compute sum/max with `tbb::parallel_reduce`
-- [ ] `onetbb-flow-graph` — producer-consumer pipeline with `tbb::flow::graph`
+- [x] `onetbb-parallel-reduce` — aggregate sum/sumsq/min/max with `tbb::parallel_reduce`
+- [x] `onetbb-flow-graph` — deterministic transform pipeline with `tbb::flow::graph`
+- [x] `onetbb-parallel-scan` — inclusive prefix sum with `tbb::parallel_scan`
 - [ ] `onemkl-dgemm` — matrix multiplication via cblas_dgemm, verify GFLOPS
 - [ ] `onemkl-fft` — FFT round-trip via DFTI
 - [ ] `oneccl-allreduce` — multi-process allreduce with oneCCL + MPI
