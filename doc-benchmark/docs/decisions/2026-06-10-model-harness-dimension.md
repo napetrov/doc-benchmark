@@ -8,7 +8,11 @@
 **Date:** 2026-06-10
 
 **Phase:** B in the umbrella rollout (land after the coverage contract, before
-subjects).
+plugin-aware cells and subjects).
+
+**Extension:** [2026-06-11-plugin-and-harness-aware-benchmarks.md](2026-06-11-plugin-and-harness-aware-benchmarks.md)
+adds explicit matrix cells for harness-specific model/plugin support and plugin
+sets such as a Caveman-style output reducer.
 
 ---
 
@@ -111,6 +115,11 @@ matrix:
 ```
 
 `matrix` omitted ⇒ exactly one cell ⇒ today's cost and behavior.
+
+The follow-up plugin ADR keeps this shorthand but also adds an explicit
+`matrix.cells` form for real harnesses that support only some models or require
+specific runtime plugins. In that form, each cell records its `model`,
+`provider`, `harness`, and `plugin_set`.
 
 ### 3.5 Changes by module
 
