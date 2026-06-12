@@ -344,6 +344,346 @@
         "expected_workflow": "simd-sort pattern",
         "why_it_matters": "Ensures the agent can identify broader algorithmic opportunities while respecting semantic constraints."
       }
+    },
+    {
+      "id": "intel-performance-skills-Q021",
+      "text": "Scenario: `perf stat` shows high branch-miss rate above 8% while cache misses are low. The hot source has rare error checks inside a tight loop. What should the agent investigate before changing the algorithm?",
+      "category": "branch_behavior",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Treat high branch misses with low cache misses as a branch-heavy signal that needs source/annotate confirmation.",
+        "Inspect hot branches and compare dynamic branch behavior with static expectations where useful.",
+        "Consider cold-path annotation or branch restructuring only for genuinely rare paths, and verify branch misses/runtime."
+      ],
+      "metadata": {
+        "persona": "compiler_performance_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow A to branch probability/cold-path analysis",
+        "why_it_matters": "Adds branch-centric coverage beyond cache and SIMD scenarios."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q022",
+      "text": "Task: A benchmark run is only 300 ms and has noisy counter values. What should the agent do to make `perf stat` evidence more trustworthy?",
+      "category": "measurement_rigor",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Use repeated `perf stat -r N` runs for short workloads and report mean/variance rather than a single sample.",
+        "Keep workload inputs and CPU affinity consistent where possible.",
+        "Avoid declaring a small regression or improvement without variance-aware evidence."
+      ],
+      "metadata": {
+        "persona": "benchmark_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "perf stat building block with repeats",
+        "why_it_matters": "Measures benchmark discipline, not just command recall."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q023",
+      "text": "Scenario: A user asks to run hardware counter profiling but `/proc/sys/kernel/perf_event_paranoid` is 3. What should the agent do next?",
+      "category": "permissions",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Explain that hardware events require elevated permissions at that paranoia level.",
+        "Offer the documented options: run with sudo, lower paranoia level, or skip hardware counter collection.",
+        "Wait for user choice before changing system settings or using sudo."
+      ],
+      "metadata": {
+        "persona": "linux_operator",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "perf setup permission check",
+        "why_it_matters": "Checks safe operational behavior around privileged profiling."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q024",
+      "text": "Scenario: The top hotspot is a tiny helper inlined into a larger request handler. How should the agent decide which source function is the real optimization candidate?",
+      "category": "profile_interpretation",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Check inlining context with perf report/objdump/addr2line rather than optimizing the helper in isolation.",
+        "If the inlinee is a thin wrapper around a lock or atomic, prioritize the outer calling pattern.",
+        "If the inlinee has substantial loop or decision logic, analyze the inlinee itself with source context."
+      ],
+      "metadata": {
+        "persona": "systems_maintainer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow D source collection and inlining check",
+        "why_it_matters": "Prevents local fixes to the wrong function boundary."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q025",
+      "text": "Task: A long-running workload takes 20 minutes. The user wants a hotspot report. How should the agent balance `perf record`, call graphs, and optional `perf stat` without wasting time?",
+      "category": "reporting",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Ensure debug symbols before the expensive recording.",
+        "Collect or reuse a valid `perf.data`; choose call graphs if needed and acceptable overhead is clear.",
+        "Skip optional `perf stat` in the report if recording duration is long and no stat data already exists, noting the absence."
+      ],
+      "metadata": {
+        "persona": "performance_consultant",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow E long-run handling",
+        "why_it_matters": "Tests cost-aware profiling workflow."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q026",
+      "text": "Scenario: A flamegraph shows a hot function named `cosine_similarity` over float vectors. The implementation is scalar. What should the agent do?",
+      "category": "known_algorithms",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Recognize a known algorithm with optimized SIMD replacement potential.",
+        "Check CPU ISA support and dispatch requirements before generating specialized code.",
+        "Verify numerical tolerance/correctness and benchmark the replacement against the scalar baseline."
+      ],
+      "metadata": {
+        "persona": "vector_search_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "known-algorithms pattern",
+        "why_it_matters": "Covers practical vector-search workloads beyond toy loops."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q027",
+      "text": "Scenario: The user asks for a fast Hamming distance routine for byte arrays on mixed Intel CPUs. What should a skill-aware implementation plan include?",
+      "category": "known_algorithms",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Use known Hamming/popcount algorithm guidance instead of inventing a naive byte loop.",
+        "Provide CPU-dispatched variants where ISA support differs, plus a portable fallback.",
+        "Include correctness tests across edge lengths and benchmark representative sizes."
+      ],
+      "metadata": {
+        "persona": "search_infrastructure_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "known-algorithms plus cpu-dispatch module",
+        "why_it_matters": "Tests new-code generation, not only diagnosis of existing code."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q028",
+      "text": "Scenario: A hot loop uses `_mm_*` SSE intrinsics and hand-written unrolling. The target fleet includes AVX2 and older SSE-only hosts. How should the agent propose modernization?",
+      "category": "simd",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Identify narrow SIMD as an opportunity but preserve support for SSE-only machines.",
+        "Use CPU dispatch or compiler target variants to select AVX2 where available and fallback otherwise.",
+        "Check alignment, tail handling, `vzeroupper`, and benchmark both supported paths."
+      ],
+      "metadata": {
+        "persona": "library_maintainer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "simd-upconversion plus cpu-dispatch",
+        "why_it_matters": "Forces production-safe SIMD advice across a heterogeneous fleet."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q029",
+      "text": "Task: A PTS test has no source compilation step because it uses a prebuilt binary. The user still asks to edit and optimize the source. What should the agent report?",
+      "category": "pts_integration",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Inspect the PTS install script/source preparation path to determine whether source editing is possible.",
+        "If there is no compilation/source step, state that source editing is not possible through the PTS workflow.",
+        "Still allow profiling/reporting of the binary where feasible, while separating that from source optimization."
+      ],
+      "metadata": {
+        "persona": "benchmark_owner",
+        "skill_under_test": "phoronix-test-suite",
+        "expected_workflow": "PTS source preparation guardrail",
+        "why_it_matters": "Prevents fake optimization claims on non-editable benchmark artifacts."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q030",
+      "text": "Scenario: A PTS benchmark score improves from 120 to 110 after a change, but its metadata says higher is better. How should the agent report the result?",
+      "category": "benchmark_reporting",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Use the PTS `hib` metadata to determine score direction.",
+        "Report this as a regression when higher is better, even though the numeric value changed downward.",
+        "Include baseline, changed score, delta, percentage, and verdict."
+      ],
+      "metadata": {
+        "persona": "benchmark_engineer",
+        "skill_under_test": "phoronix-test-suite",
+        "expected_workflow": "Evaluate test scores",
+        "why_it_matters": "Checks benchmark semantics and prevents inverted conclusions."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q031",
+      "text": "Scenario: A hot path calls `fprintf` and `abort` from inside a rarely-taken error branch in a function that otherwise dominates runtime. What should the agent investigate?",
+      "category": "code_layout",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Recognize a possible cold-path annotation opportunity.",
+        "Confirm the branch is rare using profile or branch probability evidence where available.",
+        "Mark error handlers cold or restructure cold path, then inspect layout/performance after recompilation."
+      ],
+      "metadata": {
+        "persona": "compiler_performance_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "cold-path-annotation pattern",
+        "why_it_matters": "Covers instruction-cache/code-layout improvements."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q032",
+      "text": "Task: The user gives only a `perf.data` file and no command line. What should the agent be able to do, and what limitations must it state?",
+      "category": "profile_reuse",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Reuse a valid existing recording for top functions and annotation if it matches the current binary and debug symbols.",
+        "State limitations around missing workload command, environment, repeatability, and stale address mappings.",
+        "Avoid collecting new data or claiming regression/improvement without a reproducible command."
+      ],
+      "metadata": {
+        "persona": "performance_consultant",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "perf.data reuse guardrails",
+        "why_it_matters": "Tests practical handling of partial artifacts."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q033",
+      "text": "Scenario: Flow D finds more than ten jumping functions at high core counts, making prioritization unclear. What should the agent do next?",
+      "category": "scaling_analysis",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Recognize that the delta is too broad to prioritize reliably.",
+        "Collect or reuse a midpoint profile at N/2 cores and compare midpoint versus N-core to isolate late-scaling bottlenecks.",
+        "Use the shorter jumper list for focused c2c/annotate diagnosis."
+      ],
+      "metadata": {
+        "persona": "hpc_scaling_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow D midpoint refinement",
+        "why_it_matters": "Tests whether the agent can refine ambiguous scaling evidence."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q034",
+      "text": "Task: A user asks the agent to apply a false-sharing fix immediately after seeing a c2c table, but source ownership is unclear. What should a safe response contain before editing code?",
+      "category": "change_control",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Show the affected struct or fields and connect them to HITM offsets/functions.",
+        "Explain the proposed layout change and possible ABI/memory footprint impact.",
+        "Get user approval before modifying source when the skill's presentation section requires it."
+      ],
+      "metadata": {
+        "persona": "library_maintainer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "false-sharing presentation protocol",
+        "why_it_matters": "Performance fixes can change ABI/layout; this tests safe edit discipline."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q035",
+      "text": "Scenario: `perf report` shows high kernel time and syscall-heavy stacks, while user-space compute functions are not dominant. What diagnosis and next actions are appropriate?",
+      "category": "syscall_overhead",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Interpret high kernel time as I/O or syscall-bound rather than CPU compute-bound.",
+        "Investigate syscall frequency, batching, async I/O, buffering, or lock/futex wait paths depending on stacks.",
+        "Avoid SIMD/source-loop optimization until user-space hotspots appear."
+      ],
+      "metadata": {
+        "persona": "systems_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow A system-level interpretation",
+        "why_it_matters": "Expands coverage to non-compute bottlenecks."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q036",
+      "text": "Task: Write new performance-sensitive CRC32C code for a library that ships on old and new x86 systems. What should the agent include beyond the fastest kernel?",
+      "category": "new_code",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Use the fast CRC32C implementation guidance with multiple ISA-specific variants.",
+        "Add runtime CPU dispatch and a plain portable fallback.",
+        "Include test vectors, build flag guidance, and performance measurements for relevant buffer sizes."
+      ],
+      "metadata": {
+        "persona": "library_author",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "fast-crc32c implementation module",
+        "why_it_matters": "Evaluates production-ready code generation from skill guidance."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q037",
+      "text": "Scenario: An optimization improves `perf stat` IPC but makes the benchmark score worse. Which result should the agent trust and how should it explain the conflict?",
+      "category": "benchmark_rigor",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Trust the benchmark's end metric for user-visible performance when it is valid and reproducible.",
+        "Use perf counters to explain mechanisms, not as a substitute for the benchmark score.",
+        "Report the regression and investigate whether the change shifted bottlenecks, increased work, or altered semantics."
+      ],
+      "metadata": {
+        "persona": "benchmark_owner",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "perf evidence versus benchmark outcome",
+        "why_it_matters": "Prevents counter-optimized but product-regressing changes."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q038",
+      "text": "Task: The agent is asked to optimize a program but no source is available. What useful work remains possible, and what claims are out of bounds?",
+      "category": "black_box_profiling",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Collect black-box perf stat/report evidence and identify whether hotspots are in application, libraries, kernel, or runtime.",
+        "Suggest configuration, library version, environment, or rebuild-with-symbols experiments where supported.",
+        "Do not claim source-level fixes or exact line-level causes without source/debug information."
+      ],
+      "metadata": {
+        "persona": "platform_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "black-box profiling with limits",
+        "why_it_matters": "Tests honest boundary setting under incomplete access."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q039",
+      "text": "Scenario: After fixing the top lock bottleneck, a new memory-bound function becomes dominant. What should the agent do according to the scaling workflow?",
+      "category": "iteration",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Treat this as expected bottleneck unmasking after the first fix.",
+        "Re-profile the updated binary rather than relying on the stale pre-fix ranking.",
+        "Add a new iteration section to the report and continue until thresholds or scaling goals are met."
+      ],
+      "metadata": {
+        "persona": "hpc_scaling_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow D iteration",
+        "why_it_matters": "Checks that the agent does not stop after one attractive fix."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q040",
+      "text": "Task: Design an answer rubric for evaluating whether an agent used intel-performance-skills correctly on a performance incident. What dimensions should the rubric score?",
+      "category": "meta_evaluation",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Score correct workflow selection, evidence collection, pattern classification, safe handoff between skills, and before/after verification.",
+        "Penalize unsupported fixes, stale profiles after rebuilds, wrong score direction, missing CPU capability checks, and unsafe privileged actions.",
+        "Keep awareness questions separate from executable work-task pass/fail signals."
+      ],
+      "metadata": {
+        "persona": "evaluation_designer",
+        "skill_under_test": "all",
+        "expected_workflow": "benchmark rubric design",
+        "why_it_matters": "Makes the benchmark evaluate skill application quality rather than memorized skill contents."
+      }
     }
   ]
 }
