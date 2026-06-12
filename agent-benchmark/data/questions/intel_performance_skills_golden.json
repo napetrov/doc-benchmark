@@ -1,0 +1,349 @@
+{
+  "schema_version": "questions.v1",
+  "library": "Intel Performance Skills",
+  "library_id": "intel/intel-performance-skills",
+  "description": "Golden benchmark set for evaluating whether an agent can apply the intel-performance-skills workflows to practical Linux performance diagnosis and optimization scenarios.",
+  "version_or_doc_snapshot": "intel/intel-performance-skills main branch, inspected 2026-06-12. Skills covered: linux-perf, performance-patterns, phoronix-test-suite.",
+  "questions": [
+    {
+      "id": "intel-performance-skills-Q001",
+      "text": "Scenario: A CPU-bound command `./encode --threads=1` is slow. `perf stat` reports IPC 0.55, cache miss rate 0.3%, branch miss rate 0.7%, and kernel time 2%. What performance regime should the agent infer, which workflow should it run next, and which premature conclusions should it avoid?",
+      "category": "triage",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Low IPC with low cache, branch, and kernel signals points to a compute or dependency-chain stall rather than memory, branch, or syscall domination.",
+        "Run hotspot profiling with `perf record`/`perf report` and then inspect annotated hot functions before proposing a code change.",
+        "Do not recommend cache blocking, branch hints, or I/O changes without evidence; consider serial accumulators or narrow SIMD only after source/profile evidence."
+      ],
+      "metadata": {
+        "persona": "performance_triage_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow A to Flow B escalation",
+        "why_it_matters": "Tests whether the agent interprets counters as diagnostic signals instead of matching keywords to generic optimization advice."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q002",
+      "text": "Task: The user asks for source-line hotspots from a stripped production binary. Describe the safe profiling plan, including debug-symbol handling and what must happen to any existing `perf.data` after a rebuild.",
+      "category": "profiling_setup",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Check for DWARF debug information before expensive collection using the skill's debug-symbol building block.",
+        "If source is available, offer to rebuild with `-g` while preserving the existing optimization and build flags.",
+        "If the binary is rebuilt, discard/re-record existing `perf.data` because addresses no longer match the binary."
+      ],
+      "metadata": {
+        "persona": "systems_maintainer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Ensure debug symbols before annotate",
+        "why_it_matters": "Prevents plausible but unusable reports that contain addresses with no actionable source mapping."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q003",
+      "text": "Scenario: Source contains `for (size_t i = 0; i < n; ++i) sum += a[i] * b[i];`. No profile has been collected yet. Should the agent wait for `perf annotate`, or invoke a pattern workflow now? Explain the expected diagnosis and verification.",
+      "category": "source_pattern_detection",
+      "difficulty": "easy",
+      "expected_topics": [
+        "A single scalar accumulator in a hot loop is a strong source-level trigger for the serial accumulator pattern.",
+        "Invoke the performance-patterns skill early and read the parallel-accumulator guidance before rewriting.",
+        "Verify with before/after benchmark and, when available, perf counters showing improved IPC or reduced accumulator bottleneck."
+      ],
+      "metadata": {
+        "persona": "c_cpp_optimizer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "from-source trigger to parallel-accumulator pattern",
+        "why_it_matters": "Checks whether the skill helps identify practical opportunities before over-spending on profiling."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q004",
+      "text": "Scenario: `perf stat` reports IPC 0.7, cache miss rate 18%, branch miss rate 1%, and low kernel time. What should the agent conclude, and what classes of fixes are reasonable to investigate first?",
+      "category": "counter_interpretation",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Low IPC plus high cache miss rate indicates a memory-bound workload.",
+        "Investigate data layout, cache locality, blocking, prefetching, and working-set behavior before instruction-level tuning.",
+        "Avoid treating the problem as branch-heavy, syscall-bound, or purely SIMD-width limited without more evidence."
+      ],
+      "metadata": {
+        "persona": "performance_triage_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow A interpretation",
+        "why_it_matters": "Separates evidence-driven diagnosis from generic 'make it vectorized' advice."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q005",
+      "text": "Task: A user says: \"Profile and optimize `pts/compress-zstd`.\" What should the agent do before running any manual `perf` or build command, and why?",
+      "category": "pts_integration",
+      "difficulty": "easy",
+      "expected_topics": [
+        "Immediately invoke the phoronix-test-suite skill when the target is a `pts/<name>` benchmark.",
+        "Let that skill resolve/install/run the test and handle source extraction, rebuild flags, binary deployment, and result recording.",
+        "Avoid manually rebuilding or guessing install paths because PTS benchmarks have skill-owned lifecycle details."
+      ],
+      "metadata": {
+        "persona": "benchmark_engineer",
+        "skill_under_test": "phoronix-test-suite",
+        "expected_workflow": "PTS trigger before linux-perf",
+        "why_it_matters": "Tests cross-skill routing and prevents invalid benchmark modifications."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q006",
+      "text": "Scenario: A service scales from 1 to 4 cores but plateaus after 8 cores. At 32 cores, `perf report` shows `pthread_mutex_lock` and futex paths. What workflow should the agent run, and what evidence should it collect before proposing a lock change?",
+      "category": "scaling_analysis",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Use the core-count scaling analysis workflow with threading inspection, scaling sweep, and dual 1-core versus N-core profiles.",
+        "Identify jumping functions and connect them to lock, futex, or c2c evidence before classifying the bottleneck.",
+        "Do not jump directly to an rwlock or lock-free rewrite; first determine whether the critical section is read-heavy, true-sharing, false-sharing, or CAS contention."
+      ],
+      "metadata": {
+        "persona": "backend_performance_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow D",
+        "why_it_matters": "Scaling problems need comparative evidence, not a single high-core profile."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q007",
+      "text": "Scenario: `perf c2c` shows a cache line with 12% total HITM. Thread A writes offset 0 and thread B writes offset 8 in the same struct. How should the agent classify the problem, what fix shape should it propose, and how should it verify it?",
+      "category": "cache_contention",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Different threads writing different offsets on the same hot cache line indicates false sharing.",
+        "Use the structured false-sharing fix pattern: separate or align/pad independently written fields so they do not share a cache line.",
+        "Verify with before/after throughput and reduced HITM/c2c signal, not just by compiling the changed struct."
+      ],
+      "metadata": {
+        "persona": "multicore_performance_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "false-sharing pattern from c2c evidence",
+        "why_it_matters": "Checks true cache-line reasoning rather than treating all HITM as generic lock contention."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q008",
+      "text": "Scenario: `perf annotate` shows a hot loop using `xmm` registers on a machine that supports AVX2 but not AVX-512. What should the agent inspect, which pattern applies, and what should it avoid recommending?",
+      "category": "simd",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Check CPU capabilities to establish the supported vector-width tier.",
+        "Classify the loop as narrow SIMD and apply SIMD upconversion guidance toward AVX2/YMM where semantics allow.",
+        "Avoid recommending AVX-512 or unguarded ISA-specific code on a CPU that does not support it."
+      ],
+      "metadata": {
+        "persona": "simd_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "narrow SIMD pattern with CPU capability check",
+        "why_it_matters": "Tests whether optimization advice is hardware-aware and dispatch-safe."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q009",
+      "text": "Scenario: `perf stat -e other_assists.avx_to_sse,other_assists.sse_to_avx` reports non-zero AVX-to-SSE assists, and annotate shows an extreme cost on the first SSE instruction after an AVX function. What is the likely pattern and the minimal verification loop?",
+      "category": "simd_transition",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Classify this as a missing `vzeroupper` AVX-to-SSE transition penalty.",
+        "Add `vzeroupper` or `_mm256_zeroupper()` at appropriate AVX exits before returning to SSE code, following the pattern detail file.",
+        "Verify that AVX-to-SSE assists drop to zero or near zero and that runtime/cycles improve."
+      ],
+      "metadata": {
+        "persona": "low_level_performance_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "missing-vzeroupper pattern",
+        "why_it_matters": "Catches a specialized but costly x86 transition issue that generic profilers often miss."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q010",
+      "text": "Scenario: A C function `void add(float *a, float *b, float *out, int n)` is called only with non-overlapping buffers. Annotate shows a scalar aliasing preamble and two loop versions. What should the agent propose, and what language/verification caveats matter?",
+      "category": "compiler_vectorization",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Recognize missing `restrict` as the likely source of alias checks or scalar fallback.",
+        "Only propose `restrict` when the non-overlap contract is true and document that this is C-specific; C++ uses non-standard `__restrict__` extensions.",
+        "Verify by inspecting that the alias preamble/fallback is removed or reduced and by measuring performance."
+      ],
+      "metadata": {
+        "persona": "c_maintainer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "missing-restrict pattern",
+        "why_it_matters": "Checks whether the agent can improve vectorization without introducing undefined behavior."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q011",
+      "text": "Scenario: A spinlock uses a loop that repeatedly performs `lock cmpxchg` until it succeeds. Throughput declines as thread count rises. What should the agent diagnose and what evidence distinguishes this from an ordinary mutex bottleneck?",
+      "category": "lock_contention",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Diagnose a test-and-set spinlock pattern causing cache-line bouncing under contention.",
+        "Evidence includes `lock cmpxchg` or `lock xchg` density in annotate and a dual-profile jump at high core counts.",
+        "Apply the TTAS pattern by adding an ordinary read spin before attempting the atomic exchange, then verify scaling."
+      ],
+      "metadata": {
+        "persona": "concurrency_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "TTAS pattern",
+        "why_it_matters": "Distinguishes CAS-line contention from sleep/wakeup mutex behavior."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q012",
+      "text": "Scenario: A request path updates `atomic_fetch_add(&global_bytes, n)` for every packet. At 64 threads, this counter dominates. How should the agent classify the bottleneck, and why is this not automatically a false-sharing fix?",
+      "category": "shared_counters",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Classify the bottleneck as a shared statistics counter or true-sharing counter hotspot.",
+        "Propose per-CPU, per-thread, or batched aggregation rather than a single global atomic in the hot path.",
+        "Do not call it false sharing unless c2c shows different offsets on one cache line; same counter offset written by many CPUs is true sharing."
+      ],
+      "metadata": {
+        "persona": "network_service_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "per-cpu-stats pattern",
+        "why_it_matters": "Prevents misclassification of cache-line contention patterns."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q013",
+      "text": "Scenario: A worker pool calls `notify_all()` for each job. Profiles show `futex_wake`, `try_to_wake_up`, high context-switch rates, and collapsing IPC while CPU utilization remains high. What diagnosis should the agent make and how should it validate the fix?",
+      "category": "scheduler_overhead",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Recognize condition-variable thundering herd rather than useful compute saturation.",
+        "Reduce wakeups by waking only workers that have work or by using a bounded queue/work accounting design.",
+        "Validate with reduced context switches/futex activity and improved throughput at high thread counts."
+      ],
+      "metadata": {
+        "persona": "runtime_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "cv-thundering-herd pattern",
+        "why_it_matters": "Tests whether the agent can separate scheduler overhead from application lock contention."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q014",
+      "text": "Scenario: A read-mostly cache is protected by `pthread_mutex_lock`; writes are rare, and readers dominate at high core counts. What information must the agent gather before recommending an rwlock, and what risks should it mention?",
+      "category": "lock_design",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Confirm the critical section is genuinely read-heavy and that reads do not mutate shared state.",
+        "Use profile/lock evidence to show reader serialization is the bottleneck before proposing mutex-to-rwlock.",
+        "Mention writer starvation, lock type semantics, and the need for before/after scaling validation."
+      ],
+      "metadata": {
+        "persona": "c_service_maintainer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "mutex-to-rwlock pattern",
+        "why_it_matters": "Avoids a common but unsafe blanket recommendation to replace every mutex with an rwlock."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q015",
+      "text": "Scenario: A hot function named `crc32c_update` is dominated by a single `_mm_crc32_u64` accumulator. What should the agent infer and what does a robust replacement plan need to include?",
+      "category": "known_algorithms",
+      "difficulty": "medium",
+      "expected_topics": [
+        "Recognize fast CRC32C as a known performance pattern and avoid treating the single accumulator as memory-bound by default.",
+        "Use a multi-accumulator or VPCLMULQDQ-based implementation with runtime CPU dispatch and a portable fallback.",
+        "Verify correctness against known CRC32C test vectors and measure throughput before/after."
+      ],
+      "metadata": {
+        "persona": "storage_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "fast-crc32c pattern",
+        "why_it_matters": "Checks practical use of known optimized algorithm replacements with correctness guardrails."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q016",
+      "text": "End-to-end task: The user asks: \"Create a hotspot report for `./solver case1`.\" What should the final artifact contain, and where should the agent stop short if the user only asked for a report?",
+      "category": "reporting",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Run the hotspot report workflow: ensure debug symbols, collect/reuse perf record, optionally collect perf stat for short runs, and identify top functions.",
+        "Produce a structured Markdown report with system-level summary, top functions, annotated source or assembly fallback, and pattern observations.",
+        "Do not prescribe or apply fixes in the report-only flow; name observations and wait for a follow-up optimization request."
+      ],
+      "metadata": {
+        "persona": "performance_consultant",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow E",
+        "why_it_matters": "Evaluates deliverable quality, not just diagnosis snippets."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q017",
+      "text": "End-to-end task: The user asks: \"Optimize `pts/x265` and report the gain.\" List the required lifecycle from baseline to final report, including which skills own which steps.",
+      "category": "benchmark_optimization",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Use phoronix-test-suite to resolve/install/run the baseline, parse the score/unit, persist the baseline, and prepare source safely.",
+        "Use linux-perf to profile the actual benchmark binary and performance-patterns to select evidence-backed optimizations.",
+        "Rebuild through the PTS workflow, rerun the benchmark, compare using higher-is-better/lower-is-better metadata, and report score, delta, verdict, and pending ideas."
+      ],
+      "metadata": {
+        "persona": "benchmark_owner",
+        "skill_under_test": "phoronix-test-suite",
+        "expected_workflow": "PTS Flow B with linux-perf and performance-patterns handoff",
+        "why_it_matters": "Tests benchmark rigor and cross-skill orchestration."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q018",
+      "text": "End-to-end task: A user asks: \"Why does adding cores make this program slower?\" Describe a high-quality investigation plan and the stopping condition for iteration.",
+      "category": "scaling_analysis",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Start with threading inspection and a scaling sweep to locate the inflection point, collecting anchor profiles where useful.",
+        "Compare 1-core and N-core profiles to find jumping functions, then use focused c2c/annotate evidence to classify each bottleneck.",
+        "After each fix, rebuild and rerun profiles because bottleneck ordering changes; stop when no jumper exceeds threshold or scaling is acceptable."
+      ],
+      "metadata": {
+        "persona": "hpc_scaling_engineer",
+        "skill_under_test": "linux-perf",
+        "expected_workflow": "Flow D iterative scaling diagnosis",
+        "why_it_matters": "Checks that the agent treats scaling as an iterative evidence loop."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q019",
+      "text": "Scenario: A profile shows the dominant hotspot in a system `.so` rather than the application binary, and the symbol is listed in the skill's known library-version table. What should the agent recommend and what should it avoid?",
+      "category": "dependency_hotspots",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Classify this as a library version upgrade opportunity when the symbol and DSO match the known table.",
+        "Recommend an upgrade or controlled A/B experiment with a newer library version before changing application source.",
+        "Avoid rewriting callers or local algorithms without evidence that the application code, rather than the library implementation, is the bottleneck."
+      ],
+      "metadata": {
+        "persona": "platform_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "library-version-upgrade pattern",
+        "why_it_matters": "Tests whether the agent can solve performance by changing the right layer."
+      }
+    },
+    {
+      "id": "intel-performance-skills-Q020",
+      "text": "Task: Review a new analytics path that repeatedly calls `std::sort` on large `float` arrays and does not require stable ordering. What performance opportunity should the agent consider, and what compatibility checks are needed before recommending it?",
+      "category": "algorithm_replacement",
+      "difficulty": "hard",
+      "expected_topics": [
+        "Recognize SIMD sort as a known pattern for primitive numeric arrays.",
+        "Check whether stable ordering is required, whether data types are supported, and which CPU ISA/dispatch path is available.",
+        "Recommend a benchmarked x86-simd-sort-style replacement only with correctness tests and before/after timing."
+      ],
+      "metadata": {
+        "persona": "analytics_engineer",
+        "skill_under_test": "performance-patterns",
+        "expected_workflow": "simd-sort pattern",
+        "why_it_matters": "Ensures the agent can identify broader algorithmic opportunities while respecting semantic constraints."
+      }
+    }
+  ]
+}
