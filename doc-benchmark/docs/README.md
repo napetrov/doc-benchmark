@@ -1,57 +1,42 @@
-# doc-benchmark: measuring what actually helps an agent
+# doc-benchmark: measure what actually helps an agent
 
-> **TL;DR** — Everyone ships context for AI agents: documentation, skills, MCP
-> servers, agent persona prompts, plugins. Almost nobody *measures* whether any
-> of it helps. This project treats every such artifact as a **treatment** in a
-> controlled experiment: same model, same questions/tasks, same judge — only the
-> artifact changes — and reports the score delta **with statistical
-> significance**, so "it feels better" becomes "it is +9.5 points, p = 0.0024".
+The idea in three points:
 
-## The idea
+- An agent is more than its model. It is **model + the context you give it**:
+  docs, skills, MCP servers, system prompts (agent profiles), plugins.
+- All of that is cheap to write — and easy to over-claim. Does it really help,
+  or does it just add tokens?
+- So we test it like an experiment: **change one thing, keep everything else
+  fixed, measure the delta — and check it is statistically significant.**
 
-An agent's ability to solve a problem is shaped by far more than the base
-model. It is the *sum* of:
+```text
+ same questions ──► │ model              │ ──► answers ──► judge ──► score A
+ same questions ──► │ model + artifact   │ ──► answers ──► judge ──► score B
 
-- the **base model** (and the harness/CLI it runs in),
-- the **documentation** it can retrieve (local files, URLs, Context7, MCP
-  doc servers),
-- the **skills** it is given (reusable `SKILL.md` procedures and playbooks),
-- the **agent profile** (the system prompt / persona it operates under),
-- **runtime plugins** that modify behavior (e.g. brevity instructions),
-- and the **way** the artifact is delivered (injected up-front vs. fetched by
-  the agent through a tool call).
+                    delta = B − A,  p-value = "is this real or noise?"
+```
 
-Each of these is cheap to author and easy to over-claim. The hard question is
-always the same: **does this artifact measurably improve the agent's answers
-and task outcomes — for this model, on this product — or is it just adding
-tokens?**
+## What can be compared (arms)
 
-doc-benchmark answers that with the standard tool for the job: a controlled
-A/B (in fact N-way) comparison. Every artifact becomes an **arm**:
-
-| Arm | What is being evaluated |
+| Arm | What it tests |
 |---|---|
-| `baseline` | the bare model — the control |
-| `docs:` / `mcp:` | documentation injection (local, URL, Context7, real MCP server) |
-| `skill:` | a skill's instructions injected as context |
+| `baseline` | the bare model (control) |
+| `docs:` / `mcp:` | injected documentation (local files, URL, Context7, real MCP server) |
+| `skill:` | a skill (`SKILL.md`) injected as context |
 | `profile:` | an agent persona system prompt |
 | `agent:` / `skill-agent:` | **agentic** use — the model gets a tool and *decides* whether to fetch docs / load the skill |
 
-Runtime plugins (e.g. `plugin:caveman`) are not arms: they are a separate run
-dimension passed via `--plugins`, applied to *every* arm inside the same
-`(model, harness, plugin_set)` cell and stamped into the report metadata.
+Two fine-print notes:
 
-Everything else is held fixed: the answer model, the question set (the full
-`benchmark run` pipeline additionally records a `question_set_hash` so reuse
-can be proven across runs), temperature, and the LLM judge. To avoid self-judging
-inflation, the judge should be a **different model/provider** than the answer
-model — set `--judge-model` / `--judge-provider` explicitly, since the CLI
-defaults both roles to the same model. What remains is the marginal value of
-the artifact itself.
+- Plugins (e.g. `plugin:caveman`) are not arms — they go in via `--plugins`
+  and apply to every arm in the run.
+- Set `--judge-model` / `--judge-provider` to a different model than the
+  answerer; the CLI defaults both to the same model, and self-judging
+  inflates scores.
 
-## Example: what the results look like
+## Example results
 
-A skill evaluated across four models, on the same golden question set:
+One skill, four models, same golden question set:
 
 | Model | WITH skill | WITHOUT skill | Delta | p-value | Significant? |
 |---|---|---|---|---|---|
@@ -60,102 +45,66 @@ A skill evaluated across four models, on the same golden question set:
 | Sonnet 4.6 | 74.3 | 69.9 | +4.4 | 0.1797 | ❌ |
 | Opus 4.8 | 80.8 | 78.1 | +2.7 | 0.1530 | ❌ |
 
-This single table demonstrates the core lessons of the methodology:
+What this table teaches:
 
-1. **Impact depends on the model.** The same skill is worth +9.5 points to a
-   small model and +2.7 to a frontier one. Stronger models already "know" more,
-   so the artifact's marginal value shrinks — a delta is only meaningful inside
-   its `(model, harness)` cell, never as a universal number.
-2. **A positive delta is not a result until it survives a significance test.**
-   Three of the four deltas are positive but *not* statistically significant
-   (paired t-test on per-question score pairs, p ≥ 0.05) — with this sample
-   size they are indistinguishable from judge noise. Reporting "+4.9, helps!"
-   would be exactly the over-claiming this project exists to prevent.
-3. **The actionable conclusion is targeted.** Ship this skill to agents running
-   on smaller/cheaper models, where it provably closes the gap; for frontier
-   models, collect more samples or accept that it may not pay for its tokens.
+- **Value depends on the model.** The same skill is worth +9.5 to a small
+  model and +2.7 to a frontier one — stronger models already know more.
+- **No p-value, no claim.** Three deltas are positive but not significant —
+  at this sample size they may be judge noise.
+- **The conclusion is targeted.** Ship this skill where it provably helps
+  (smaller/cheaper models); gather more data for the rest.
 
-Beyond the headline p-value, the two-arm (with/without) evaluation reports
-include Wilcoxon signed-rank tests, Cohen's d effect size, per-dimension
-scores (correctness, completeness, specificity, code quality, actionability),
-and trust-gate checks; bootstrap confidence intervals are computed by the
-separate grounding-metrics path. The N-way
-`arms run` report currently summarizes per-arm average scores and deltas vs
-baseline; for significance statistics, reduce to a baseline-vs-one-treatment
-comparison (e.g. via `scripts/compare_models.py`).
+*Where the stats come from:* the two-arm (with/without) reports compute the
+paired t-test, Wilcoxon, and Cohen's d; the N-way `arms run` report shows
+average scores and deltas vs baseline (use `scripts/compare_models.py` for
+baseline-vs-one-treatment significance). The full `benchmark run` pipeline
+also records a `question_set_hash` to prove question-set reuse across runs.
 
 ## How the evaluation flows
 
 ```text
-        WHAT WE EVALUATE (the treatments / subjects)
-  docs sources · MCP servers · skills · agent profiles · plugins
-                              │
-┌─────────────────────────────▼──────────────────────────────────┐
-│ 1. BUILD THE PROBE SET                                         │
-│    personas (synthetic users from real GitHub activity)        │
-│      → topic extraction → question generation                  │
-│    or curated golden question sets (regression-stable)         │
-│    questions span conceptual / how-to / troubleshooting /      │
-│    comparison / performance × beginner / intermediate / adv.   │
-├────────────────────────────────────────────────────────────────┤
-│ 2. RUN EVERY ARM                                               │
-│    same model answers every question once per arm:             │
-│      baseline | +docs | +skill | +profile | agentic tool use   │
-│    agentic arms record whether the model actually used the     │
-│    tool — usability, not just relevance                        │
-├────────────────────────────────────────────────────────────────┤
-│ 3. JUDGE INDEPENDENTLY                                         │
-│    an LLM judge — configure a different model/provider than    │
-│    the answerer — scores all answers blind on 5 dimensions     │
-│    (0–100); optional 3-role judge panel and RAGAS              │
-│    meta-evaluation as cross-checks                             │
-├────────────────────────────────────────────────────────────────┤
-│ 4. ANALYZE & GATE                                              │
-│    per-arm delta vs baseline (arms report); paired t-test /    │
-│    Wilcoxon / Cohen's d for baseline-vs-treatment pairs ·      │
-│    results per (model × harness × plugin) cell ·               │
-│    trust checks, baselines, regression gates, dashboards       │
-└────────────────────────────┬───────────────────────────────────┘
-                             ▼
-        scorecard: "this artifact is worth +X on model M
-              (p = …)" — the evidence to ship or cut it
+┌─ 1. QUESTIONS ──────────────────────────────────────────────┐
+│   personas (synthetic users) → generated questions,         │
+│   or curated golden sets                                    │
+├─ 2. ANSWERS ────────────────────────────────────────────────┤
+│   the same model answers every question once per arm;       │
+│   agentic arms also record whether the tool was used        │
+├─ 3. JUDGE ──────────────────────────────────────────────────┤
+│   a separate LLM scores all answers blind (0–100) on        │
+│   5 dimensions; optional judge panel + RAGAS cross-checks   │
+├─ 4. RESULTS ────────────────────────────────────────────────┤
+│   deltas vs baseline · significance tests · gates ·         │
+│   dashboards — reported per (model × harness × plugins)     │
+└─────────────────────────────────────────────────────────────┘
+        ▼
+  scorecard: "worth +X on model M (p = …)" — ship it or cut it
 ```
 
-Two complementary tracks back this up:
+Two more tracks back this up:
 
-- **Static track** — fast, LLM-free quality checks on the documentation itself
-  (structure coverage, freshness, readability, whether code examples actually
-  execute), with hard/soft gates and regression detection for CI.
-- **Executable task track** — Terminal-Bench/Harbor-style tasks
-  ([`terminal-bench-tasks/`](../terminal-bench-tasks/)) where an agent must
-  edit code, compile, and pass tests in Docker. Judge prose can be fooled;
-  a pytest verifier cannot. This is where the *procedural* value of skills
-  and profiles (which single-answer judging under-measures) shows up.
+- **Static track** — LLM-free checks on the docs themselves: structure,
+  freshness, readability, do the code examples run.
+- **Executable task track** — [`terminal-bench-tasks/`](../terminal-bench-tasks/):
+  the agent must edit code, compile, and pass tests in Docker. A judge can be
+  fooled by prose; a pytest verifier cannot.
 
 ## Why this matters
 
-Marketplaces and registries rank agent artifacts by popularity and trend —
-which structurally buries niche, expert tooling (the current focus here is
-Intel performance libraries: oneTBB, oneDAL, oneMKL, …). The alternative this
-repo pursues: every shipped skill, doc source, or agent profile carries the
-**scorecard that earned it**, and the scorecard stays alive as models, docs,
-and harnesses change. Measurement is the gate, not an afterthought. See the
-[umbrella README](../../README.md) for how this feeds the broader
+Marketplaces rank agent artifacts by popularity, which buries niche expert
+tooling (focus here: Intel performance libraries — oneTBB, oneDAL, oneMKL).
+Here, every shipped skill, doc source, or profile carries the **scorecard
+that earned it**, kept alive as models and docs change. See the
+[umbrella README](../../README.md) for the bigger
 author → build → **measure** → package → discover → serve cycle.
 
 ## Explore
 
-- Run a treatment comparison yourself:
-  [evaluating-treatments.md](evaluating-treatments.md) — `cli.py arms run`
-  with any mix of `baseline,docs,mcp:…,skill:…,profile:…,agent:…`.
-- Full pipeline in one command:
-  [quickstart.md](quickstart.md) — personas → questions → answers → judge →
-  report, with cost estimates.
-- The reasoning behind the design:
-  [decisions/benchmark-methodology.md](decisions/benchmark-methodology.md)
-  (model roles, question taxonomy, judging, trust checks) and
-  [decisions/2026-05-29-evaluating-mcp-skills-personas.md](decisions/2026-05-29-evaluating-mcp-skills-personas.md)
-  (why skills/MCP/profiles became first-class arms).
+- Run a comparison: [evaluating-treatments.md](evaluating-treatments.md) —
+  `cli.py arms run` with any mix of arms.
+- Full pipeline in one command: [quickstart.md](quickstart.md) — personas →
+  questions → answers → judge → report, with cost estimates.
+- Design rationale: [decisions/benchmark-methodology.md](decisions/benchmark-methodology.md)
+  and [decisions/2026-05-29-evaluating-mcp-skills-personas.md](decisions/2026-05-29-evaluating-mcp-skills-personas.md).
 
 ---
 
