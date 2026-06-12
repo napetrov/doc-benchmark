@@ -36,12 +36,17 @@ A/B (in fact N-way) comparison. Every artifact becomes an **arm**:
 | `skill:` | a skill's instructions injected as context |
 | `profile:` | an agent persona system prompt |
 | `agent:` / `skill-agent:` | **agentic** use — the model gets a tool and *decides* whether to fetch docs / load the skill |
-| `plugin:` | runtime behavior modifiers, reported as a separate run dimension |
+
+Runtime plugins (e.g. `plugin:caveman`) are not arms: they are a separate run
+dimension passed via `--plugins`, applied to *every* arm inside the same
+`(model, harness, plugin_set)` cell and stamped into the report metadata.
 
 Everything else is held fixed: the answer model, the question set (hashed so
-reuse can be proven), temperature, and an **independent LLM judge** (a
-different model/provider than the one answering, to avoid self-judging
-inflation). What remains is the marginal value of the artifact itself.
+reuse can be proven), temperature, and the LLM judge. To avoid self-judging
+inflation, the judge should be a **different model/provider** than the answer
+model — set `--judge-model` / `--judge-provider` explicitly, since the CLI
+defaults both roles to the same model. What remains is the marginal value of
+the artifact itself.
 
 ## Example: what the results look like
 
@@ -95,9 +100,10 @@ trust-gate checks.
 │    tool — usability, not just relevance                        │
 ├────────────────────────────────────────────────────────────────┤
 │ 3. JUDGE INDEPENDENTLY                                         │
-│    a different model/provider scores all answers blind on      │
-│    5 dimensions (0–100); optional 3-role judge panel and       │
-│    RAGAS meta-evaluation as cross-checks                       │
+│    an LLM judge — configure a different model/provider than    │
+│    the answerer — scores all answers blind on 5 dimensions     │
+│    (0–100); optional 3-role judge panel and RAGAS              │
+│    meta-evaluation as cross-checks                             │
 ├────────────────────────────────────────────────────────────────┤
 │ 4. ANALYZE & GATE                                              │
 │    per-arm delta vs baseline · paired t-test / Wilcoxon /      │
