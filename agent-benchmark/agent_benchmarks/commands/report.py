@@ -19,6 +19,9 @@ def cmd_report_model_compare(args: argparse.Namespace) -> None:
     )
 
     run_ids = [rid.strip() for rid in args.run_ids.split(",")]
+    if not run_ids or any(not rid for rid in run_ids) or len(set(run_ids)) != len(run_ids):
+        print("Error: --run-ids must contain unique, non-empty labels", file=sys.stderr)
+        raise SystemExit(1)
 
     if not args.regular_runs and not args.golden_runs:
         print("Error: must provide at least --regular-runs or --golden-runs", file=sys.stderr)
