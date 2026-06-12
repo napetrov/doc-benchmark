@@ -1,4 +1,4 @@
-# doc-benchmark: measure what actually helps an agent
+# agent-benchmark: measure what actually helps an agent
 
 The idea in three points:
 
