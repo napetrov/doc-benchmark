@@ -223,10 +223,6 @@ the answer model and judge fixed when comparing arms.
 Use `report model-compare` to compare judged treatment-arm JSON files from
 multiple models.
 
-The command is the packaged successor to the standalone scripts added in
-PR\u202060. Both `scripts/compare_models.py` and `scripts/compare_models_combined.py`
-remain available but the package command is the recommended path.
-
 The intended input is one judged arms JSON file per model for regular questions
 and/or golden questions. The report extracts the `baseline_arm` score as the
 baseline and the treatment arm as the context arm, then computes:
