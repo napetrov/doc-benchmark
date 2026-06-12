@@ -14,4 +14,4 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY dot_serial.cpp /app/dot_serial.cpp
 COPY perf_stat.txt /app/perf_stat.txt
-RUN g++ -O3 -std=c++17 /app/dot_serial.cpp -o /app/dot_serial
+RUN g++ -O2 -fno-tree-vectorize -fno-unroll-loops -std=c++17 /app/dot_serial.cpp -o /app/dot_serial
