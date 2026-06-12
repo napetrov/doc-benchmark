@@ -153,6 +153,18 @@ def test_extract_scores_no_baseline_arm_returns_empty():
     assert extract_scores(run) == []
 
 
+def test_extract_scores_skips_question_where_baseline_absent_from_scores():
+    """baseline_arm is set on the run but a specific question's scores dict
+    doesn't contain that key at all — question must be silently skipped."""
+    run = _eval_run([
+        {"id": "Q1", "scores": {"skill:dpnp": {"aggregate": 70}}},  # no "baseline" key
+        {"id": "Q2", "scores": {"baseline": {"aggregate": 50}, "skill:dpnp": {"aggregate": 70}}},
+    ])
+    scores = extract_scores(run)
+    assert len(scores) == 1
+    assert scores[0]["question_id"] == "Q2"
+
+
 def test_extract_scores_all_failed_returns_empty():
     """All questions missing aggregate should return empty list, not crash."""
     run = _eval_run([
