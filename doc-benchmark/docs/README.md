@@ -70,7 +70,7 @@ also records a `question_set_hash` to prove question-set reuse across runs.
 │   the same model answers every question once per arm;       │
 │   agentic arms also record whether the tool was used        │
 ├─ 3. JUDGE ──────────────────────────────────────────────────┤
-│   a separate LLM scores all answers blind (0–100) on        │
+│   a separate LLM scores all answers (0–100) on              │
 │   5 dimensions; optional judge panel + RAGAS cross-checks   │
 ├─ 4. RESULTS ────────────────────────────────────────────────┤
 │   deltas vs baseline · significance tests · gates ·         │
