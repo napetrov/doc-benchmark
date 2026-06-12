@@ -41,8 +41,9 @@ Runtime plugins (e.g. `plugin:caveman`) are not arms: they are a separate run
 dimension passed via `--plugins`, applied to *every* arm inside the same
 `(model, harness, plugin_set)` cell and stamped into the report metadata.
 
-Everything else is held fixed: the answer model, the question set (hashed so
-reuse can be proven), temperature, and the LLM judge. To avoid self-judging
+Everything else is held fixed: the answer model, the question set (the full
+`benchmark run` pipeline additionally records a `question_set_hash` so reuse
+can be proven across runs), temperature, and the LLM judge. To avoid self-judging
 inflation, the judge should be a **different model/provider** than the answer
 model — set `--judge-model` / `--judge-provider` explicitly, since the CLI
 defaults both roles to the same model. What remains is the marginal value of
@@ -75,9 +76,10 @@ This single table demonstrates the core lessons of the methodology:
    models, collect more samples or accept that it may not pay for its tokens.
 
 Beyond the headline p-value, the two-arm (with/without) evaluation reports
-include Wilcoxon signed-rank tests, Cohen's d effect size, bootstrap
-confidence intervals, per-dimension scores (correctness, completeness,
-specificity, code quality, actionability), and trust-gate checks. The N-way
+include Wilcoxon signed-rank tests, Cohen's d effect size, per-dimension
+scores (correctness, completeness, specificity, code quality, actionability),
+and trust-gate checks; bootstrap confidence intervals are computed by the
+separate grounding-metrics path. The N-way
 `arms run` report currently summarizes per-arm average scores and deltas vs
 baseline; for significance statistics, reduce to a baseline-vs-one-treatment
 comparison (e.g. via `scripts/compare_models.py`).
