@@ -30,6 +30,9 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+COMPARE_MODELS_SCRIPT = SCRIPT_DIR / "compare_models.py"
+
 try:
     from zoneinfo import ZoneInfo
 
@@ -38,20 +41,22 @@ except ImportError:
     _TZ = None
 
 
-def run_compare_models(runs: list[str], run_ids: str, temp_out: Path) -> str:
+def run_compare_models(runs: list[str], run_ids: str, temp_out: Path, run_type: str) -> str:
     """Run compare_models.py and return markdown content."""
-    cmd = (
-        [sys.executable, "scripts/compare_models.py", "--runs"]
-        + runs
-        + ["--run-ids", run_ids, "--out", str(temp_out)]
-    )
+    if run_type not in {"regular", "golden"}:
+        raise ValueError(f"Unknown run type: {run_type}")
+    run_flag = "--regular-runs" if run_type == "regular" else "--golden-runs"
+    cmd = [sys.executable, str(COMPARE_MODELS_SCRIPT), run_flag] + runs + [
+        "--run-ids", run_ids, "--out", str(temp_out)
+    ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
 
     if result.returncode != 0:
-        print("Error running compare_models.py:", file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError(
+            f"compare_models.py failed for {run_type} runs with exit code {result.returncode}:\n"
+            f"{result.stderr.strip()}"
+        )
 
     return temp_out.read_text(encoding="utf-8")
 
@@ -123,8 +128,15 @@ def main():
             temp_path = Path(tmp.name)
 
         print("Generating regular questions analysis...")
-        regular_content = run_compare_models(args.regular_runs, args.run_ids, temp_path)
-        temp_path.unlink()
+        try:
+            regular_content = run_compare_models(
+                args.regular_runs, args.run_ids, temp_path, "regular"
+            )
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        finally:
+            temp_path.unlink(missing_ok=True)
 
         # Skip header from sub-report
         regular_lines = regular_content.split("\n")
@@ -153,8 +165,13 @@ def main():
             temp_path = Path(tmp.name)
 
         print("Generating golden questions analysis...")
-        golden_content = run_compare_models(args.golden_runs, args.run_ids, temp_path)
-        temp_path.unlink()
+        try:
+            golden_content = run_compare_models(args.golden_runs, args.run_ids, temp_path, "golden")
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        finally:
+            temp_path.unlink(missing_ok=True)
 
         # Skip header from sub-report
         golden_lines = golden_content.split("\n")

@@ -1,12 +1,13 @@
 {
   "library": "DPNP",
   "library_id": "IntelPython/dpnp",
-  "description": "Golden regression set for DPNP - Data Parallel NumPy",
+  "description": "Golden regression set for DPNP - Data Parallel Extension for NumPy",
   "version_or_doc_snapshot": "dpnp 0.17.0 documentation (intelpython.github.io/dpnp, accessed 2026-06-10) and IntelPython/dpnp GitHub repository issues",
   "questions": [
     {
       "id": "dpnp-Q001",
-      "text": "Scenario: You replace numpy.unique(arr, sort=False) with dpnp.unique(arr, sort=False) in production code and get TypeError: unexpected keyword argument 'sort'. This breaks your data pipeline. According to dpnp documentation, how should you check API compatibility before migration, and what's the recommended fallback pattern for unsupported parameters?",
+      "text": "Scenario: You replace numpy.unique(arr, sorted=False) with dpnp.unique(arr, sorted=False) in production code and get TypeError: unexpected keyword argument 'sorted'. This breaks your data pipeline. According to dpnp documentation, how should you check API compatibility before migration, and what's the recommended fallback pattern for unsupported parameters?",
+      "persona": "ml_engineer_migrating",
       "category": "compatibility_pitfalls",
       "difficulty": "medium",
       "expected_topics": [
@@ -17,7 +18,6 @@
         "no automated compatibility checker currently available - must test manually"
       ],
       "metadata": {
-        "persona": "ml_engineer_migrating",
         "must_cite": [
           "https://intelpython.github.io/dpnp/reference/"
         ],
@@ -30,6 +30,7 @@
     {
       "id": "dpnp-Q002",
       "text": "Scenario: Your dpnp code works on your workstation with GPU but crashes on a cloud VM with 'Default device is unavailable'. You realize dpnp was trying to use GPU. According to dpnp documentation, how do you (a) check which device dpnp will use, (b) explicitly select CPU, and (c) handle environments where GPU is unavailable?",
+      "persona": "devops_engineer",
       "category": "device_management",
       "difficulty": "medium",
       "expected_topics": [
@@ -40,7 +41,6 @@
         "environment-dependent behavior means code may work in development but fail in production"
       ],
       "metadata": {
-        "persona": "devops_engineer",
         "must_cite": [
           "https://intelpython.github.io/dpnp/overview.html"
         ],
@@ -53,6 +53,7 @@
     {
       "id": "dpnp-Q003",
       "text": "Scenario: You've migrated 80% of your NumPy code to dpnp successfully. Then at runtime in production, you hit NotImplementedError for a function you didn't test. According to dpnp documentation, what's the recommended strategy for (a) discovering unsupported APIs before deployment, (b) handling NotImplementedError gracefully, and (c) mixing dpnp and NumPy code safely?",
+      "persona": "software_engineer",
       "category": "api_coverage",
       "difficulty": "medium",
       "expected_topics": [
@@ -63,7 +64,6 @@
         "incremental migration recommended: start with hot paths, keep fallback to numpy for edge cases"
       ],
       "metadata": {
-        "persona": "software_engineer",
         "must_cite": [
           "https://intelpython.github.io/dpnp/reference/"
         ],
@@ -76,6 +76,7 @@
     {
       "id": "dpnp-Q004",
       "text": "Scenario: You need to checkpoint your ML model which includes dpnp arrays, but pickle.dump() or numpy.save() fails. According to dpnp documentation, what's the recommended approach for persisting dpnp arrays, and what's the trade-off?",
+      "persona": "ml_engineer",
       "category": "serialization",
       "difficulty": "medium",
       "expected_topics": [
@@ -86,7 +87,6 @@
         "this limitation affects model saving, distributed training, and any pipeline with persistence"
       ],
       "metadata": {
-        "persona": "ml_engineer",
         "must_cite": [
           "https://intelpython.github.io/dpnp/reference/ndarray.html"
         ],
@@ -99,6 +99,7 @@
     {
       "id": "dpnp-Q005",
       "text": "Scenario: You replaced numpy with dpnp in a data preprocessing pipeline expecting automatic speedup. For small arrays (100-1000 elements) processed in tight loops, the code is now slower. The documentation says dpnp is 'optimized for data parallel devices' but doesn't specify when it's faster. What guidance should dpnp documentation provide about array sizes, overhead, and when NOT to use dpnp?",
+      "persona": "performance_engineer",
       "category": "performance_expectations",
       "difficulty": "medium",
       "expected_topics": [
@@ -109,7 +110,6 @@
         "selective adoption recommended: profile first, use dpnp for bottlenecks, keep NumPy for small-array hot paths"
       ],
       "metadata": {
-        "persona": "performance_engineer",
         "must_cite": [
           "https://intelpython.github.io/dpnp/overview.html"
         ],
@@ -121,18 +121,18 @@
     },
     {
       "id": "dpnp-Q006",
-      "text": "Scenario: You run 'pip install dpnp' expecting it to work like other Python packages, but encounter installation failures or incomplete builds. According to dpnp documentation, what is the officially recommended installation method, why is conda preferred over pip, and what dependencies are required?",
+      "text": "Scenario: You run 'pip install dpnp' expecting it to work like other Python packages, but encounter installation failures because the Intel package index or native runtime dependencies are missing. According to dpnp documentation, what installation method is recommended, when is pip acceptable, and what dependencies are required?",
+      "persona": "data_scientist_new_user",
       "category": "installation",
       "difficulty": "easy",
       "expected_topics": [
-        "dpnp officially supports conda installation via Intel channel or conda-forge",
-        "pip installation is not officially supported or recommended due to complex native dependencies",
-        "dpnp requires SYCL runtime and Intel oneAPI components that conda handles automatically",
+        "conda installation via Intel channel is the recommended path for most users",
+        "pip installation is available as an alternative when using Intel's pip index and compatible native dependencies",
+        "dpnp requires SYCL runtime and Intel oneAPI components that conda handles more consistently",
         "building from source requires oneAPI DPC++ compiler and specific oneAPI libraries",
         "conda installation ensures compatible versions of all dependencies"
       ],
       "metadata": {
-        "persona": "data_scientist_new_user",
         "must_cite": [
           "https://intelpython.github.io/dpnp/"
         ],
@@ -145,6 +145,7 @@
     {
       "id": "dpnp-Q007",
       "text": "Scenario: You discover that dpnp.linalg.cholesky returns significantly different values than numpy.linalg.cholesky for the same input matrix (not just floating-point precision differences). According to dpnp best practices, how should you validate numerical correctness when migrating from NumPy, and what testing strategy ensures dpnp operations produce correct results?",
+      "persona": "scientific_computing_engineer",
       "category": "numerical_correctness",
       "difficulty": "hard",
       "expected_topics": [
@@ -156,7 +157,6 @@
         "for mission-critical computations, consider dual-running dpnp and NumPy during validation phase"
       ],
       "metadata": {
-        "persona": "scientific_computing_engineer",
         "must_cite": [
           "https://intelpython.github.io/dpnp/reference/linalg.html"
         ],

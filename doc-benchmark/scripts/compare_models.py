@@ -23,8 +23,8 @@ Usage:
         --out results/dpnp_compare.md
 
 Generates a comprehensive report with:
-- Overall summary (WITH/WITHOUT docs, delta)
-- Statistical significance (t-test, Wilcoxon, Cohen's d)
+- Overall summary (context arm/baseline, delta)
+- Statistical significance (t-test, Wilcoxon, Cohen's d_z)
 - Static vs Dynamic breakdown (if both types present)
 - Difficulty analysis
 - Head-to-Head comparison
@@ -33,6 +33,7 @@ Generates a comprehensive report with:
 
 import argparse
 import json
+import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -56,8 +57,15 @@ except ImportError:
 
 def load_run(path: str) -> dict[str, Any]:
     """Load a judged results JSON file."""
-    with open(path) as f:
-        return json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError as exc:
+        raise SystemExit(f"Error: File not found: {path}") from exc
+    except PermissionError as exc:
+        raise SystemExit(f"Error: Permission denied reading {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Error: Invalid JSON in {path}: {exc}") from exc
 
 
 def extract_scores(run_data: dict) -> list[dict]:
@@ -66,25 +74,33 @@ def extract_scores(run_data: dict) -> list[dict]:
 
     # Check if scores are in evaluations field (new format)
     if "evaluations" in run_data:
-        baseline_arm = run_data["baseline_arm"]
+        baseline_arm = run_data.get("baseline_arm")
+        if not isinstance(baseline_arm, str) or not baseline_arm:
+            return []
 
         for evaluation in run_data["evaluations"]:
-            qid = evaluation["question_id"]
+            qid = evaluation.get("question_id")
+            if not qid:
+                continue
             eval_scores = evaluation.get("scores", {})
 
-            if not eval_scores:
+            if not isinstance(eval_scores, dict) or not eval_scores:
+                continue
+            if baseline_arm not in eval_scores:
                 continue
 
             baseline_data = eval_scores.get(baseline_arm, {})
-            if baseline_data is None:
+            if not isinstance(baseline_data, dict):
                 continue
             baseline_score = baseline_data.get("aggregate")
 
             # Find treatment arm (not baseline)
             treatment_score = None
+            treatment_arm = None
             for arm_name, arm_scores in eval_scores.items():
-                if arm_name != baseline_arm and arm_scores is not None:
+                if arm_name != baseline_arm and isinstance(arm_scores, dict):
                     treatment_score = arm_scores.get("aggregate")
+                    treatment_arm = arm_name
                     break
 
             if baseline_score is not None and treatment_score is not None:
@@ -98,21 +114,30 @@ def extract_scores(run_data: dict) -> list[dict]:
                         "without_docs": baseline_score,
                         "with_docs": treatment_score,
                         "delta": treatment_score - baseline_score,
+                        "treatment_arm": treatment_arm,
                     }
                 )
 
     # Fallback to old format (evaluation inside arms)
     else:
-        for answer in run_data.get("answers", []):
-            qid = answer["question_id"]
-            arms = answer.get("arms", {})
+        baseline_arm = run_data.get("baseline_arm")
+        if not isinstance(baseline_arm, str) or not baseline_arm:
+            return []
 
-            baseline_eval = arms.get(run_data["baseline_arm"], {}).get("evaluation", {})
+        for answer in run_data.get("answers", []):
+            qid = answer.get("question_id")
+            if not qid:
+                continue
+            arms = answer.get("arms", {})
+            if not isinstance(arms, dict) or baseline_arm not in arms or len(arms) < 2:
+                continue
+
+            baseline_eval = arms.get(baseline_arm, {}).get("evaluation", {})
 
             # Find treatment arm (not baseline)
             treatment_arm = None
             for arm_name in arms.keys():
-                if arm_name != run_data["baseline_arm"]:
+                if arm_name != baseline_arm:
                     treatment_arm = arm_name
                     break
 
@@ -134,6 +159,7 @@ def extract_scores(run_data: dict) -> list[dict]:
                         "without_docs": baseline_score,
                         "with_docs": treatment_score,
                         "delta": treatment_score - baseline_score,
+                        "treatment_arm": treatment_arm,
                     }
                 )
 
@@ -152,7 +178,9 @@ def significance_test(with_scores: list[float], without_scores: list[float]) -> 
 
     deltas = [w - wo for w, wo in zip(with_scores, without_scores, strict=True)]
     d_mean = sum(deltas) / len(deltas)
-    d_std = (sum((x - d_mean) ** 2 for x in deltas) / len(deltas)) ** 0.5
+    if len(deltas) < 2:
+        return None
+    d_std = (sum((x - d_mean) ** 2 for x in deltas) / (len(deltas) - 1)) ** 0.5
 
     result = {
         "n": len(with_scores),
@@ -171,7 +199,9 @@ def significance_test(with_scores: list[float], without_scores: list[float]) -> 
         result["p_wilcoxon"] = None
 
     result["cohens_d"] = round(d_mean / d_std, 3) if d_std > 0 else 0.0
-    result["significant"] = bool(p_ttest < 0.05)
+    result["significant"] = bool(
+        p_ttest < 0.05 and (result["p_wilcoxon"] is None or result["p_wilcoxon"] < 0.05)
+    )
 
     # Effect size interpretation
     abs_d = abs(result["cohens_d"])
@@ -266,24 +296,23 @@ def generate_section_report(
     runs: list[tuple[str, dict]], run_ids: list[str], section_name: str
 ) -> list[str]:
     """Generate report section for a set of runs (regular or golden)."""
-    """Generate multi-model comparison report."""
 
     # Extract scores for each run
-    all_run_scores = {}
+    all_run_scores_raw = {}
     for run_id, run_data in runs:
-        all_run_scores[run_id] = extract_scores(run_data)
+        all_run_scores_raw[run_id] = extract_scores(run_data)
 
     # Find common questions across all runs
-    question_sets = [set(s["question_id"] for s in scores) for scores in all_run_scores.values()]
+    question_sets = [set(s["question_id"] for s in scores) for scores in all_run_scores_raw.values()]
     common_questions = set.intersection(*question_sets) if question_sets else set()
+    all_run_scores = {
+        run_id: [s for s in all_run_scores_raw.get(run_id, []) if s["question_id"] in common_questions]
+        for run_id in run_ids
+    }
 
     lines = []
 
-    # Header
     lines += [
-        "#  Model Comparison Report",
-        f"_Generated: {datetime.now(tz=_TZ).strftime('%Y-%m-%d %H:%M %Z') if _TZ else datetime.now().strftime('%Y-%m-%d %H:%M UTC')}_",
-        "",
         "## Models Compared",
         "| Run ID | Answer model | Judge model |",
         "|---|---|---|",
@@ -299,13 +328,14 @@ def generate_section_report(
     lines += [
         "",
         f"Common questions evaluated: **{len(common_questions)}**",
+        "_All summary, significance, ranking, and head-to-head metrics below use only this common question set._",
         "",
     ]
 
     # Overall Summary
     lines += [
         "## Overall Summary",
-        "| Run | N | WITH docs | WITHOUT docs | Delta | Improved | Degraded |",
+        "| Run | N | Context arm | Baseline | Delta | Improved | Degraded |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
 
@@ -338,9 +368,9 @@ def generate_section_report(
     if HAS_SCIPY:
         lines += [
             "## Statistical Significance of Delta (α = 0.05)",
-            "_Is each model's delta (WITH − WITHOUT) statistically meaningful?_",
+            "_Is each model's context-arm delta statistically meaningful? p-values are unadjusted; treat many pairwise comparisons as exploratory unless corrected separately. A result is marked significant only when the paired t-test is < 0.05 and Wilcoxon is either < 0.05 or unavailable._",
             "",
-            "| Run | Delta | p (t-test) | p (Wilcoxon) | Cohen's d | Effect | Significant? |",
+            "| Run | Delta | p (t-test) | p (Wilcoxon) | Cohen's d_z | Effect | Significant? |",
             "|---|---:|---:|---:|---:|---|---|",
         ]
 
@@ -375,7 +405,7 @@ def generate_section_report(
     if static_prefix:
         lines += [
             "## Static (Golden) vs Dynamic",
-            "| Run | Type | N | WITH | WITHOUT | Delta |",
+            "| Run | Type | N | Context arm | Baseline | Delta |",
             "|---|---|---:|---:|---:|---:|",
         ]
 
@@ -419,7 +449,7 @@ def generate_section_report(
         # Build header dynamically
         header_parts = ["| Difficulty | N |"]
         for run_id in run_ids:
-            header_parts.append(f" {run_id} WITH | {run_id} Δ |")
+            header_parts.append(f" {run_id} context | {run_id} Δ |")
         lines[-1] = "".join(header_parts)
         lines.append("|---|---:|" + "|---:|---:|" * len(run_ids))
 
@@ -446,9 +476,9 @@ def generate_section_report(
 
         lines += [""]
 
-    # Head-to-Head (WITH docs, common questions)
+    # Head-to-Head (context arm, common questions)
     lines += [
-        "## Head-to-Head (WITH docs, common questions)",
+        "## Head-to-Head (context arm, common questions)",
         "| Winner | Count | % |",
         "|---|---:|---:|",
     ]
@@ -483,12 +513,12 @@ def generate_section_report(
 
     lines += [""]
 
-    # Doc Retrieval Benefit — Delta Comparison
+    # Context-arm benefit — Delta Comparison
     lines += [
-        "## Doc Retrieval Benefit — Delta Comparison",
-        "_Which model benefits more from documentation context?_",
+        "## Context-Arm Benefit — Delta Comparison",
+        "_Which model benefits more from the non-baseline treatment arm (docs, skill, profile, or other context)?_",
         "",
-        "| Run | Avg Delta | Questions docs helped | Questions docs hurt |",
+        "| Run | Avg Delta | Questions context helped | Questions context hurt |",
         "|---|---:|---:|---:|",
     ]
 
@@ -511,8 +541,8 @@ def generate_section_report(
     lines += [
         "## Model Ranking",
         "",
-        "### By absolute quality (WITH docs)",
-        "| Rank | Run | WITH docs avg |",
+        "### By absolute quality (context arm)",
+        "| Rank | Run | Context-arm avg |",
         "|---:|---|---:|",
     ]
 
@@ -522,7 +552,7 @@ def generate_section_report(
 
     lines += [
         "",
-        "### By retrieval utilisation (Delta)",
+        "### By treatment utilisation (Delta)",
         "| Rank | Run | Delta |",
         "|---:|---|---:|",
     ]
@@ -553,7 +583,7 @@ def main():
 
     # Validate: at least one of regular-runs or golden-runs must be provided
     if not args.regular_runs and not args.golden_runs:
-        print("Error: Must provide at least --regular-runs or --golden-runs")
+        print("Error: Must provide at least --regular-runs or --golden-runs", file=sys.stderr)
         return 1
 
     run_ids = [rid.strip() for rid in args.run_ids.split(",")]
@@ -561,13 +591,15 @@ def main():
     # Validate run counts
     if args.regular_runs and len(args.regular_runs) != len(run_ids):
         print(
-            f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})"
+            f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})",
+            file=sys.stderr,
         )
         return 1
 
     if args.golden_runs and len(args.golden_runs) != len(run_ids):
         print(
-            f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})"
+            f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})",
+            file=sys.stderr,
         )
         return 1
 

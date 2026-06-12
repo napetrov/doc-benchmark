@@ -1,7 +1,7 @@
 {
   "library": "DPNP",
   "library_id": "IntelPython/dpnp",
-  "description": "Data Parallel NumPy — NumPy-compatible array operations on Intel CPUs and GPUs",
+  "description": "Data Parallel Extension for NumPy",
   "questions": [
     {
       "id": "dpnp-gs-01",
@@ -9,7 +9,7 @@
       "persona": "Data scientist exploring Intel Python",
       "category": "getting_started",
       "difficulty": 1,
-      "expected_topics": ["conda install", "pip install", "version check", "import test"]
+      "expected_topics": ["conda install (Intel channel)", "pip install (Intel pip index)", "version check", "import test"]
     },
     {
       "id": "dpnp-gs-02",

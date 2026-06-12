@@ -9,10 +9,10 @@ Use this skill when working with Intel-optimized Python array operations, or whe
 ## Installation
 
 ```bash
-# conda (recommended)
+# Conda (officially recommended)
 conda install -c intel dpnp
 
-# pip
+# Alternative: pip (may have native dependency issues)
 pip install dpnp
 
 # verify installation
@@ -71,4 +71,48 @@ result = np.dot(mat, mat.T)
 - **First run is slow**: JIT compilation happens on first execution. Time the second run.
 - **Not all NumPy APIs available**: Check compatibility with `dir(dpnp)` or documentation.
 - **Data transfer cost**: Converting between dpnp and NumPy arrays has overhead. Avoid in tight loops.
-- **Small arrays slower**: dpnp has dispatch overhead. Use NumPy for small arrays (<1K elements).
+- **Small arrays slower**: dpnp has dispatch overhead. Use NumPy for small arrays (<1,000 elements).
+
+## Compatibility and fallback pattern
+
+```python
+import dpnp
+import numpy as np
+
+def safe_unique(x):
+    try:
+        return dpnp.unique(x)
+    except (NotImplementedError, TypeError):
+        host_x = dpnp.asnumpy(x) if isinstance(x, dpnp.ndarray) else x
+        return np.unique(host_x)
+```
+
+Use `dpnp.asnumpy()` when a downstream library needs a NumPy array. Keep
+conversions at API boundaries; repeated device-to-host copies inside tight loops
+can erase acceleration gains.
+
+Pandas, scikit-learn, and many NumPy-based libraries usually expect NumPy arrays.
+Use dpnp for numeric hot paths, then convert once with `asnumpy()` before calling
+host-oriented libraries.
+
+## Device control
+
+```python
+import dpctl
+import dpnp as np
+
+print(dpctl.select_default_device())
+
+with dpctl.device_context("cpu"):
+    x = np.arange(100_000)
+    print(x.sycl_device)
+```
+
+Use `dpctl` to inspect or constrain CPU/GPU selection when code must run across
+workstations, containers, and cloud VMs with different SYCL devices.
+
+## Profiling and validation
+
+- Warm up once before timing to avoid measuring first-run compilation.
+- Compare against NumPy with `numpy.testing.assert_allclose()` for critical math.
+- Profile end-to-end pipelines, including conversions and host-library calls.
