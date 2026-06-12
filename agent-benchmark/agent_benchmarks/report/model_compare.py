@@ -1,39 +1,24 @@
-#!/usr/bin/env python3
-"""
-Multi-model comparison script for agent-benchmark results.
+"""Multi-model comparison report generation.
 
-Usage:
-    # Compare models on regular questions only
-    python scripts/compare_models.py \
-        --regular-runs results/arms/dpnp_regular_sonnet46.json results/arms/dpnp_regular_opus48.json \
-        --run-ids sonnet46,opus48 \
-        --out results/dpnp_compare.md
+Public API
+----------
+check_run_consistency(runs, group_name)
+    Validate a list of (run_id, run_data) pairs before comparison.
+    Raises SystemExit on hard errors; returns a list of warning strings.
 
-    # Compare models on golden questions only
-    python scripts/compare_models.py \
-        --golden-runs results/arms/dpnp_golden_sonnet46.json results/arms/dpnp_golden_opus48.json \
-        --run-ids sonnet46,opus48 \
-        --out results/dpnp_compare.md
+extract_scores(run_data, force_treatment_arm=None)
+    Extract per-question scores from an arms JSON artifact.
 
-    # Compare models on both regular AND golden questions
-    python scripts/compare_models.py \
-        --regular-runs results/arms/dpnp_regular_sonnet46.json results/arms/dpnp_regular_opus48.json \
-        --golden-runs results/arms/dpnp_golden_sonnet46.json results/arms/dpnp_golden_opus48.json \
-        --run-ids sonnet46,opus48 \
-        --out results/dpnp_compare.md
+generate_combined_report(regular_runs, golden_runs, run_ids, out_path, treatment_arm=None)
+    Write a Markdown comparison report to *out_path*.
 
-Generates a comprehensive report with:
-- Overall summary (context arm/baseline, delta)
-- Statistical significance (t-test, Wilcoxon, Cohen's d_z)
-- Static vs Dynamic breakdown (if both types present)
-- Difficulty analysis
-- Head-to-Head comparison
-- Per-model weak spots
+generate_section_report(runs, run_ids, section_name, treatment_arm=None)
+    Return a list of Markdown lines for one question-set section (regular or golden).
 """
 
-import argparse
+from __future__ import annotations
+
 import json
-import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +30,6 @@ try:
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
-    print("Warning: scipy not installed. Statistical tests will be skipped.")
 
 try:
     from zoneinfo import ZoneInfo
@@ -55,8 +39,13 @@ except ImportError:
     _TZ = None
 
 
+# ---------------------------------------------------------------------------
+# I/O helpers
+# ---------------------------------------------------------------------------
+
+
 def load_run(path: str) -> dict[str, Any]:
-    """Load a judged results JSON file."""
+    """Load a judged arms JSON file.  Raises SystemExit with a clear message on failure."""
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -68,15 +57,19 @@ def load_run(path: str) -> dict[str, Any]:
         raise SystemExit(f"Error: Invalid JSON in {path}: {exc}") from exc
 
 
+# ---------------------------------------------------------------------------
+# Consistency validation
+# ---------------------------------------------------------------------------
+
+
 def check_run_consistency(
     runs: list[tuple[str, dict]],
     group_name: str,
 ) -> list[str]:
-    """Check runs for known consistency problems; return list of warning strings.
+    """Check runs for consistency problems; return warning strings.
 
-    Hard errors (different baseline_arm) are raised immediately.
-    Soft warnings (hash mismatch, identical models, sparse common questions)
-    are collected and returned so the caller can print them.
+    Hard errors (different ``baseline_arm``) raise ``SystemExit`` immediately.
+    Soft warnings (hash mismatch, identical models) are collected and returned.
     """
     if len(runs) < 2:
         return []
@@ -93,7 +86,7 @@ def check_run_consistency(
             "Comparing runs with different baselines produces meaningless deltas."
         )
 
-    # 2. question_set_hash — warn if present in multiple runs but diverges
+    # 2. question_set_hash — warn if present in all runs but diverges
     hashes = {
         run_id: data["question_set_hash"]
         for run_id, data in runs
@@ -107,11 +100,8 @@ def check_run_consistency(
             "will still be used but results may not be directly comparable."
         )
 
-    # 3. identical model+provider across all runs likely means duplicate runs, not a comparison
-    models = [
-        (data.get("model", ""), data.get("provider", ""))
-        for _, data in runs
-    ]
+    # 3. identical model+provider across all runs likely means duplicate runs
+    models = [(data.get("model", ""), data.get("provider", "")) for _, data in runs]
     if len(set(models)) == 1:
         m, p = models[0]
         warnings.append(
@@ -122,22 +112,30 @@ def check_run_consistency(
     return warnings
 
 
-def extract_scores(run_data: dict, force_treatment_arm: str | None = None) -> list[dict]:
-    """Extract question-level scores from a run.
+# ---------------------------------------------------------------------------
+# Score extraction
+# ---------------------------------------------------------------------------
+
+
+def extract_scores(
+    run_data: dict,
+    force_treatment_arm: str | None = None,
+) -> list[dict]:
+    """Extract question-level scores from an arms artifact.
 
     Parameters
     ----------
     run_data:
-        Parsed arms JSON artifact.
+        Parsed arms JSON artifact (``arms.v1`` schema or legacy format).
     force_treatment_arm:
-        When given, only scores for this arm are extracted as the treatment.
-        Raises ``SystemExit`` if the arm is absent from the data.
-        When ``None``, the first non-baseline arm is used; raises ``SystemExit``
-        if there is more than one non-baseline arm (ambiguous).
+        When given, only scores for this arm are used as the treatment.
+        Raises ``SystemExit`` if the arm is absent.
+        When ``None``, the single non-baseline arm is auto-selected; raises
+        ``SystemExit`` if there is more than one non-baseline arm (ambiguous).
     """
     scores = []
 
-    # Check if scores are in evaluations field (new format)
+    # New format: scores live inside top-level "evaluations"
     if "evaluations" in run_data:
         baseline_arm = run_data.get("baseline_arm")
         if not isinstance(baseline_arm, str) or not baseline_arm:
@@ -159,15 +157,9 @@ def extract_scores(run_data: dict, force_treatment_arm: str | None = None) -> li
                 continue
             baseline_score = baseline_data.get("aggregate")
 
-            # Find treatment arm (not baseline)
-            # Validate or auto-select treatment arm once per run (using first question)
-            # The actual per-question selection happens below.
-            treatment_score = None
-            treatment_arm = None
-
             non_baseline_arms = [
-                arm_name for arm_name in eval_scores
-                if arm_name != baseline_arm and isinstance(eval_scores[arm_name], dict)
+                arm for arm in eval_scores
+                if arm != baseline_arm and isinstance(eval_scores[arm], dict)
             ]
 
             if force_treatment_arm is not None:
@@ -188,6 +180,9 @@ def extract_scores(run_data: dict, force_treatment_arm: str | None = None) -> li
             if target_arm is not None and isinstance(eval_scores.get(target_arm), dict):
                 treatment_score = eval_scores[target_arm].get("aggregate")
                 treatment_arm = target_arm
+            else:
+                treatment_score = None
+                treatment_arm = None
 
             if baseline_score is not None and treatment_score is not None:
                 scores.append(
@@ -204,7 +199,7 @@ def extract_scores(run_data: dict, force_treatment_arm: str | None = None) -> li
                     }
                 )
 
-    # Fallback to old format (evaluation inside arms)
+    # Legacy format: scores live inside per-answer "arms"
     else:
         baseline_arm = run_data.get("baseline_arm")
         if not isinstance(baseline_arm, str) or not baseline_arm:
@@ -219,8 +214,6 @@ def extract_scores(run_data: dict, force_treatment_arm: str | None = None) -> li
                 continue
 
             baseline_eval = arms.get(baseline_arm, {}).get("evaluation", {})
-
-            # Find treatment arm (not baseline)
             non_baseline_arms = [a for a in arms if a != baseline_arm]
 
             if force_treatment_arm is not None:
@@ -263,13 +256,27 @@ def extract_scores(run_data: dict, force_treatment_arm: str | None = None) -> li
     return scores
 
 
-def avg(lst):
-    """Calculate average, handling empty lists."""
+# ---------------------------------------------------------------------------
+# Statistics helpers
+# ---------------------------------------------------------------------------
+
+
+def _avg(lst: list[float]) -> float:
     return round(sum(lst) / len(lst), 1) if lst else 0.0
 
 
-def significance_test(with_scores: list[float], without_scores: list[float]) -> dict | None:
-    """Compute paired t-test, Wilcoxon, and Cohen's d."""
+def _fmt_delta(d: float | None) -> str:
+    if d is None:
+        return "N/A"
+    if isinstance(d, float):
+        d = round(d, 1)
+    return f"+{d}" if d > 0 else str(d)
+
+
+def significance_test(
+    with_scores: list[float], without_scores: list[float]
+) -> dict | None:
+    """Paired t-test, Wilcoxon, and Cohen's d_z (sample SD).  Requires scipy."""
     if len(with_scores) < 5 or not HAS_SCIPY:
         return None
 
@@ -279,7 +286,7 @@ def significance_test(with_scores: list[float], without_scores: list[float]) -> 
         return None
     d_std = (sum((x - d_mean) ** 2 for x in deltas) / (len(deltas) - 1)) ** 0.5
 
-    result = {
+    result: dict[str, Any] = {
         "n": len(with_scores),
         "delta_mean": round(d_mean, 2),
         "delta_std": round(d_std, 2),
@@ -297,10 +304,10 @@ def significance_test(with_scores: list[float], without_scores: list[float]) -> 
 
     result["cohens_d"] = round(d_mean / d_std, 3) if d_std > 0 else 0.0
     result["significant"] = bool(
-        p_ttest < 0.05 and (result["p_wilcoxon"] is None or result["p_wilcoxon"] < 0.05)
+        p_ttest < 0.05
+        and (result["p_wilcoxon"] is None or result["p_wilcoxon"] < 0.05)
     )
 
-    # Effect size interpretation
     abs_d = abs(result["cohens_d"])
     if abs_d < 0.2:
         result["effect"] = "negligible"
@@ -314,13 +321,9 @@ def significance_test(with_scores: list[float], without_scores: list[float]) -> 
     return result
 
 
-def fmt_delta(d):
-    """Format delta with + sign for positive values."""
-    if d is None:
-        return "N/A"
-    if isinstance(d, float):
-        d = round(d, 1)
-    return f"+{d}" if d > 0 else str(d)
+# ---------------------------------------------------------------------------
+# Report generation
+# ---------------------------------------------------------------------------
 
 
 def generate_combined_report(
@@ -329,40 +332,30 @@ def generate_combined_report(
     run_ids: list[str],
     out_path: str,
     treatment_arm: str | None = None,
-):
-    """Generate combined report for regular and/or golden questions."""
+) -> None:
+    """Write a Markdown comparison report to *out_path*."""
+    lines: list[str] = []
 
-    lines = []
-
-    # Header
     lines += [
         "#  Model Comparison Report",
         f"_Generated: {datetime.now(tz=_TZ).strftime('%Y-%m-%d %H:%M %Z') if _TZ else datetime.now().strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
     ]
 
-    # Generate separate sections for regular and golden if both are present
     if regular_runs and golden_runs:
         lines += [
             "## Overview",
             "",
             "This report compares models across two question sets:",
-            "- **Regular Questions**: 12 standard questions covering getting started, compatibility, performance, and troubleshooting",
-            "- **Golden Questions**: 7 scenario-based questions derived from real GitHub issues",
+            "- **Regular Questions**: standard questions covering getting started, compatibility, performance, and troubleshooting",
+            "- **Golden Questions**: scenario-based questions derived from real issues",
             "",
-        ]
-
-        # Regular questions section
-        lines += [
             "---",
             "",
             "# Regular Questions Analysis",
             "",
         ]
-        section_lines = generate_section_report(regular_runs, run_ids, "Regular", treatment_arm)
-        lines += section_lines
-
-        # Golden questions section
+        lines += generate_section_report(regular_runs, run_ids, "Regular", treatment_arm)
         lines += [
             "",
             "---",
@@ -370,20 +363,14 @@ def generate_combined_report(
             "# Golden Questions Analysis",
             "",
         ]
-        section_lines = generate_section_report(golden_runs, run_ids, "Golden", treatment_arm)
-        lines += section_lines
+        lines += generate_section_report(golden_runs, run_ids, "Golden", treatment_arm)
 
     elif regular_runs:
-        # Only regular questions
-        section_lines = generate_section_report(regular_runs, run_ids, "Regular", treatment_arm)
-        lines += section_lines
+        lines += generate_section_report(regular_runs, run_ids, "Regular", treatment_arm)
 
     elif golden_runs:
-        # Only golden questions
-        section_lines = generate_section_report(golden_runs, run_ids, "Golden", treatment_arm)
-        lines += section_lines
+        lines += generate_section_report(golden_runs, run_ids, "Golden", treatment_arm)
 
-    # Write output
     output = "\n".join(lines)
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     Path(out_path).write_text(output, encoding="utf-8")
@@ -391,62 +378,74 @@ def generate_combined_report(
 
 
 def generate_section_report(
-    runs: list[tuple[str, dict]], run_ids: list[str], section_name: str,
+    runs: list[tuple[str, dict]],
+    run_ids: list[str],
+    section_name: str,
     treatment_arm: str | None = None,
 ) -> list[str]:
-    """Generate report section for a set of runs (regular or golden)."""
+    """Return Markdown lines for one question-set section."""
 
-    # Extract scores for each run
-    all_run_scores_raw = {}
+    # Extract and intersect to common questions only
+    all_run_scores_raw: dict[str, list[dict]] = {}
     for run_id, run_data in runs:
-        all_run_scores_raw[run_id] = extract_scores(run_data, force_treatment_arm=treatment_arm)
+        all_run_scores_raw[run_id] = extract_scores(
+            run_data, force_treatment_arm=treatment_arm
+        )
 
-    # Find common questions across all runs
-    question_sets = [set(s["question_id"] for s in scores) for scores in all_run_scores_raw.values()]
+    question_sets = [
+        set(s["question_id"] for s in scores)
+        for scores in all_run_scores_raw.values()
+    ]
     common_questions = set.intersection(*question_sets) if question_sets else set()
-    all_run_scores = {
-        run_id: [s for s in all_run_scores_raw.get(run_id, []) if s["question_id"] in common_questions]
+
+    # All metrics below use the common-question subset exclusively
+    all_run_scores: dict[str, list[dict]] = {
+        run_id: [
+            s for s in all_run_scores_raw.get(run_id, [])
+            if s["question_id"] in common_questions
+        ]
         for run_id in run_ids
     }
 
-    lines = []
+    lines: list[str] = []
 
+    # --- Models Compared ---
     lines += [
         "## Models Compared",
         "| Run ID | Answer model | Judge model |",
         "|---|---|---|",
     ]
-
     for run_id, run_data in runs:
         model = run_data.get("model", "unknown")
         provider = run_data.get("provider", "unknown")
         judge_model = run_data.get("judge_model", "same")
         judge_provider = run_data.get("judge_provider", provider)
-        lines.append(f"| **{run_id}** | {model} ({provider}) | {judge_model} ({judge_provider}) |")
+        lines.append(
+            f"| **{run_id}** | {model} ({provider}) | {judge_model} ({judge_provider}) |"
+        )
 
     lines += [
         "",
         f"Common questions evaluated: **{len(common_questions)}**",
-        "_All summary, significance, ranking, and head-to-head metrics below use only this common question set._",
+        "_All summary, significance, ranking, and head-to-head metrics use only this common question set._",
         "",
     ]
 
-    # Overall Summary
+    # --- Overall Summary ---
     lines += [
         "## Overall Summary",
         "| Run | N | Context arm | Baseline | Delta | Improved | Degraded |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
 
-    summary_stats = {}
+    summary_stats: dict[str, dict] = {}
     for run_id in run_ids:
         scores = all_run_scores[run_id]
-        with_avg = avg([s["with_docs"] for s in scores])
-        without_avg = avg([s["without_docs"] for s in scores])
+        with_avg = _avg([s["with_docs"] for s in scores])
+        without_avg = _avg([s["without_docs"] for s in scores])
         delta_avg = round(with_avg - without_avg, 1)
         improved = sum(1 for s in scores if s["delta"] > 0)
         degraded = sum(1 for s in scores if s["delta"] < 0)
-
         summary_stats[run_id] = {
             "n": len(scores),
             "with_avg": with_avg,
@@ -455,135 +454,77 @@ def generate_section_report(
             "improved": improved,
             "degraded": degraded,
         }
-
         lines.append(
             f"| **{run_id}** | {len(scores)} | {with_avg} | {without_avg} | "
-            f"**{fmt_delta(delta_avg)}** | {improved} | {degraded} |"
+            f"**{_fmt_delta(delta_avg)}** | {improved} | {degraded} |"
         )
 
     lines += [""]
 
-    # Statistical Significance
+    # --- Statistical Significance ---
     if HAS_SCIPY:
         lines += [
             "## Statistical Significance of Delta (α = 0.05)",
-            "_Is each model's context-arm delta statistically meaningful? p-values are unadjusted; treat many pairwise comparisons as exploratory unless corrected separately. A result is marked significant only when the paired t-test is < 0.05 and Wilcoxon is either < 0.05 or unavailable._",
+            "_p-values are unadjusted; treat many pairwise comparisons as exploratory. "
+            "Significant = t-test < 0.05 and Wilcoxon < 0.05 (or unavailable)._",
             "",
             "| Run | Delta | p (t-test) | p (Wilcoxon) | Cohen's d_z | Effect | Significant? |",
             "|---|---:|---:|---:|---:|---|---|",
         ]
-
         for run_id in run_ids:
             scores = all_run_scores[run_id]
-            with_scores = [s["with_docs"] for s in scores]
-            without_scores = [s["without_docs"] for s in scores]
-
-            sig = significance_test(with_scores, without_scores)
+            sig = significance_test(
+                [s["with_docs"] for s in scores],
+                [s["without_docs"] for s in scores],
+            )
             if sig:
                 sig_mark = "✅ Yes" if sig["significant"] else "❌ No"
-                p_wilcox = sig["p_wilcoxon"] if sig["p_wilcoxon"] else "N/A"
+                p_wilcox = sig["p_wilcoxon"] if sig["p_wilcoxon"] is not None else "N/A"
                 lines.append(
-                    f"| **{run_id}** | {fmt_delta(sig['delta_mean'])} | {sig['p_ttest']} | "
-                    f"{p_wilcox} | {fmt_delta(sig['cohens_d'])} | {sig['effect']} | {sig_mark} |"
+                    f"| **{run_id}** | {_fmt_delta(sig['delta_mean'])} | {sig['p_ttest']} | "
+                    f"{p_wilcox} | {_fmt_delta(sig['cohens_d'])} | {sig['effect']} | {sig_mark} |"
                 )
-
         lines += [""]
 
-    # Static vs Dynamic (if applicable)
-    static_prefix = None
-    for scores in all_run_scores.values():
-        for s in scores:
-            qid = s["question_id"]
-            # Detect pattern like "dpnp-Q001" for static questions
-            if "-Q" in qid and qid.split("-Q")[1].isdigit():
-                static_prefix = qid.split("-Q")[0] + "-Q"
-                break
-        if static_prefix:
-            break
-
-    if static_prefix:
-        lines += [
-            "## Static (Golden) vs Dynamic",
-            "| Run | Type | N | Context arm | Baseline | Delta |",
-            "|---|---|---:|---:|---:|---:|",
-        ]
-
-        for run_id in run_ids:
-            scores = all_run_scores[run_id]
-            static = [s for s in scores if s["question_id"].startswith(static_prefix)]
-            dynamic = [s for s in scores if not s["question_id"].startswith(static_prefix)]
-
-            if static:
-                with_avg = avg([s["with_docs"] for s in static])
-                without_avg = avg([s["without_docs"] for s in static])
-                delta = round(with_avg - without_avg, 1)
-                lines.append(
-                    f"| **{run_id}** | 🔵 static | {len(static)} | {with_avg} | {without_avg} | **{fmt_delta(delta)}** |"
-                )
-
-            if dynamic:
-                with_avg = avg([s["with_docs"] for s in dynamic])
-                without_avg = avg([s["without_docs"] for s in dynamic])
-                delta = round(with_avg - without_avg, 1)
-                lines.append(
-                    f"| **{run_id}** | 🟡 dynamic | {len(dynamic)} | {with_avg} | {without_avg} | **{fmt_delta(delta)}** |"
-                )
-
-        lines += [""]
-
-    # By Difficulty (common questions only)
-    difficulty_groups = defaultdict(lambda: defaultdict(list))
+    # --- By Difficulty ---
+    difficulty_groups: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
     for run_id in run_ids:
-        scores = all_run_scores[run_id]  # already filtered to common_questions
-        for s in scores:
+        for s in all_run_scores[run_id]:  # already common questions only
             difficulty_groups[s["difficulty"]][run_id].append(s)
 
     if difficulty_groups:
+        header = "| Difficulty | N |" + "".join(
+            f" {rid} context | {rid} Δ |" for rid in run_ids
+        )
         lines += [
             "## By Difficulty (common questions only)",
-            "| Difficulty | N |",
+            header,
+            "|---|---:|" + "|---:|---:|" * len(run_ids),
         ]
-
-        # Build header dynamically
-        header_parts = ["| Difficulty | N |"]
-        for run_id in run_ids:
-            header_parts.append(f" {run_id} context | {run_id} Δ |")
-        lines[-1] = "".join(header_parts)
-        lines.append("|---|---:|" + "|---:|---:|" * len(run_ids))
-
-        difficulty_order = ["easy", "beginner", "intermediate", "medium", "advanced", "hard"]
-        for diff in difficulty_order:
+        for diff in ["easy", "beginner", "intermediate", "medium", "advanced", "hard"]:
             if diff not in difficulty_groups:
                 continue
-
             run_data = difficulty_groups[diff]
-            # N = number of common questions at this difficulty (same across all runs
-            # because all_run_scores is already filtered to common_questions)
             n = len(next(iter(run_data.values())))
-
             row = f"| {diff} | {n} |"
             for run_id in run_ids:
-                scores = run_data.get(run_id, [])
-                if scores:
-                    with_avg = avg([s["with_docs"] for s in scores])
-                    without_avg = avg([s["without_docs"] for s in scores])
-                    delta = round(with_avg - without_avg, 1)
-                    row += f" {with_avg} | {fmt_delta(delta)} |"
+                sc = run_data.get(run_id, [])
+                if sc:
+                    wa = _avg([s["with_docs"] for s in sc])
+                    wo = _avg([s["without_docs"] for s in sc])
+                    row += f" {wa} | {_fmt_delta(round(wa - wo, 1))} |"
                 else:
                     row += " — | — |"
-
             lines.append(row)
-
         lines += [""]
 
-    # Head-to-Head (context arm, common questions)
+    # --- Head-to-Head ---
     lines += [
         "## Head-to-Head (context arm, common questions)",
         "| Winner | Count | % |",
         "|---|---:|---:|",
     ]
-
-    winner_counts = defaultdict(int)
+    winner_counts: dict[str, int] = defaultdict(int)
     for qid in common_questions:
         question_scores = {}
         for run_id in run_ids:
@@ -591,53 +532,43 @@ def generate_section_report(
                 if s["question_id"] == qid:
                     question_scores[run_id] = s["with_docs"]
                     break
-
         if question_scores:
             max_score = max(question_scores.values())
             winners = [rid for rid, score in question_scores.items() if score == max_score]
-
             if len(winners) == 1:
                 winner_counts[winners[0]] += 1
             else:
                 winner_counts["tie"] += 1
 
-    total_questions = len(common_questions)
+    total = len(common_questions)
     for run_id in run_ids:
         count = winner_counts.get(run_id, 0)
-        pct = round(100 * count / total_questions) if total_questions > 0 else 0
+        pct = round(100 * count / total) if total > 0 else 0
         lines.append(f"| **{run_id}** | {count} | {pct}% |")
-
     tie_count = winner_counts.get("tie", 0)
-    tie_pct = round(100 * tie_count / total_questions) if total_questions > 0 else 0
-    lines.append(f"| tie | {tie_count} | {tie_pct}% |")
-
+    lines.append(f"| tie | {tie_count} | {round(100 * tie_count / total) if total > 0 else 0}% |")
     lines += [""]
 
-    # Context-arm benefit — Delta Comparison
+    # --- Context-Arm Benefit ---
     lines += [
         "## Context-Arm Benefit — Delta Comparison",
-        "_Which model benefits more from the non-baseline treatment arm (docs, skill, profile, or other context)?_",
+        "_Which model benefits more from the non-baseline treatment arm?_",
         "",
         "| Run | Avg Delta | Questions context helped | Questions context hurt |",
         "|---|---:|---:|---:|",
     ]
-
     for run_id in run_ids:
-        stats = summary_stats[run_id]
-        helped = stats["improved"]
-        hurt = stats["degraded"]
-        n = stats["n"]
-        helped_pct = round(100 * helped / n) if n > 0 else 0
-        hurt_pct = round(100 * hurt / n) if n > 0 else 0
-
+        st = summary_stats[run_id]
+        n = st["n"]
+        helped_pct = round(100 * st["improved"] / n) if n > 0 else 0
+        hurt_pct = round(100 * st["degraded"] / n) if n > 0 else 0
         lines.append(
-            f"| **{run_id}** | **{fmt_delta(stats['delta_avg'])}** | "
-            f"{helped} ({helped_pct}%) | {hurt} ({hurt_pct}%) |"
+            f"| **{run_id}** | **{_fmt_delta(st['delta_avg'])}** | "
+            f"{st['improved']} ({helped_pct}%) | {st['degraded']} ({hurt_pct}%) |"
         )
-
     lines += [""]
 
-    # Model Ranking
+    # --- Model Ranking ---
     lines += [
         "## Model Ranking",
         "",
@@ -645,10 +576,10 @@ def generate_section_report(
         "| Rank | Run | Context-arm avg |",
         "|---:|---|---:|",
     ]
-
-    sorted_by_quality = sorted(summary_stats.items(), key=lambda x: x[1]["with_avg"], reverse=True)
-    for rank, (run_id, stats) in enumerate(sorted_by_quality, 1):
-        lines.append(f"| {rank} | **{run_id}** | {stats['with_avg']} |")
+    for rank, (run_id, st) in enumerate(
+        sorted(summary_stats.items(), key=lambda x: x[1]["with_avg"], reverse=True), 1
+    ):
+        lines.append(f"| {rank} | **{run_id}** | {st['with_avg']} |")
 
     lines += [
         "",
@@ -656,93 +587,10 @@ def generate_section_report(
         "| Rank | Run | Delta |",
         "|---:|---|---:|",
     ]
-
-    sorted_by_delta = sorted(summary_stats.items(), key=lambda x: x[1]["delta_avg"], reverse=True)
-    for rank, (run_id, stats) in enumerate(sorted_by_delta, 1):
-        lines.append(f"| {rank} | **{run_id}** | {fmt_delta(stats['delta_avg'])} |")
+    for rank, (run_id, st) in enumerate(
+        sorted(summary_stats.items(), key=lambda x: x[1]["delta_avg"], reverse=True), 1
+    ):
+        lines.append(f"| {rank} | **{run_id}** | {_fmt_delta(st['delta_avg'])} |")
 
     lines += [""]
-
     return lines
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Compare multiple model runs")
-    parser.add_argument(
-        "--regular-runs", nargs="+", help="Paths to regular questions judged JSON files"
-    )
-    parser.add_argument(
-        "--golden-runs", nargs="+", help="Paths to golden questions judged JSON files"
-    )
-    parser.add_argument(
-        "--run-ids", required=True, help="Comma-separated run IDs (e.g., sonnet46,opus48)"
-    )
-    parser.add_argument("--out", required=True, help="Output markdown file path")
-    parser.add_argument(
-        "--treatment-arm",
-        default=None,
-        dest="treatment_arm",
-        help=(
-            "Name of the treatment arm to use as the 'with_docs' score. "
-            "Required when a run contains more than one non-baseline arm; "
-            "optional when exactly one non-baseline arm exists."
-        ),
-    )
-
-    args = parser.parse_args()
-
-    # Validate: at least one of regular-runs or golden-runs must be provided
-    if not args.regular_runs and not args.golden_runs:
-        print("Error: Must provide at least --regular-runs or --golden-runs", file=sys.stderr)
-        return 1
-
-    run_ids = [rid.strip() for rid in args.run_ids.split(",")]
-
-    # Validate run counts
-    if args.regular_runs and len(args.regular_runs) != len(run_ids):
-        print(
-            f"Error: Number of regular runs ({len(args.regular_runs)}) must match number of run IDs ({len(run_ids)})",
-            file=sys.stderr,
-        )
-        return 1
-
-    if args.golden_runs and len(args.golden_runs) != len(run_ids):
-        print(
-            f"Error: Number of golden runs ({len(args.golden_runs)}) must match number of run IDs ({len(run_ids)})",
-            file=sys.stderr,
-        )
-        return 1
-
-    # Load regular runs if provided
-    regular_runs = []
-    if args.regular_runs:
-        for run_id, run_path in zip(run_ids, args.regular_runs, strict=True):
-            print(f"Loading {run_id} (regular): {run_path}")
-            run_data = load_run(run_path)
-            regular_runs.append((run_id, run_data))
-
-    # Load golden runs if provided
-    golden_runs = []
-    if args.golden_runs:
-        for run_id, run_path in zip(run_ids, args.golden_runs, strict=True):
-            print(f"Loading {run_id} (golden): {run_path}")
-            run_data = load_run(run_path)
-            golden_runs.append((run_id, run_data))
-
-    # Consistency checks — hard errors abort early, warnings are printed
-    all_warnings: list[str] = []
-    if regular_runs:
-        all_warnings += check_run_consistency(regular_runs, "regular")
-    if golden_runs:
-        all_warnings += check_run_consistency(golden_runs, "golden")
-    for w in all_warnings:
-        print(w, file=sys.stderr)
-
-    # Generate combined report
-    generate_combined_report(regular_runs, golden_runs, run_ids, args.out, args.treatment_arm)
-
-    return 0
-
-
-if __name__ == "__main__":
-    exit(main())
