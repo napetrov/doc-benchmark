@@ -33,7 +33,7 @@ availability varies by kernel, container, PMU, host permissions, and
 tasks with synthetic profile artifacts included as files. Later tasks can run
 real `perf` only in a machine-profiled lane.
 
-## Recommended First Wave
+## Implemented First Wave
 
 These are high-signal, low-flake tasks. They can run in Docker with offline
 verification and no privileged PMU access.
@@ -43,13 +43,13 @@ verification and no privileged PMU access.
 | P0 | `intel-perf-serial-accumulator` | identify scalar reduction bottleneck and rewrite safely | slow dot product/reduction C++ file + sample `perf stat` | numeric equality + speedup threshold + source marker for multi-accumulator/vectorized structure |
 | P0 | `intel-perf-false-sharing` | find adjacent per-thread counters and separate cache lines | multithreaded counter benchmark + synthetic `perf c2c` report | correct totals + speedup/scaling threshold + layout/alignment check |
 | P0 | `intel-perf-shared-counter` | replace hot global atomic stat with local aggregation | packet/request counter benchmark + profile excerpt | exact final count + lower runtime threshold + no hot global atomic in source |
-| P0 | `intel-perf-missing-restrict` | add valid C `restrict` contract to unlock vectorization | C array kernel + compiler/vectorization hint | output equality + faster runtime + function signature check |
+| P0 | `intel-perf-missing-restrict` | add valid C `restrict` contract to unlock vectorization | C array kernel + compiler/vectorization hint | output equality + `restrict` contract + vectorization evidence |
+| P0 | `intel-perf-hotspot-report` | produce a structured report from provided perf artifacts | static `perf stat`, `perf report`, `perf annotate`, `perf c2c` files | markdown parser checks required sections and no unsupported fix claims |
 | P1 | `intel-perf-ttas-spinlock` | convert TAS spinlock to TTAS | contended lock benchmark + annotate excerpt | mutual exclusion correctness + throughput improvement + ordinary-read spin path check |
 | P1 | `intel-perf-mutex-rwlock` | replace read-mostly mutex with rwlock | adapt skill repo mutex-to-rwlock benchmark | correctness + read-heavy throughput improvement + write-path still works |
 | P1 | `intel-perf-cv-herd` | reduce excessive condition-variable wakeups | worker-pool benchmark + futex/context-switch profile excerpt | all jobs processed exactly once + runtime/context-switch proxy improvement |
 | P1 | `intel-perf-crc32c` | replace single-accumulator CRC32C with dispatched implementation | scalar/single-accumulator CRC32C | known vectors + throughput threshold + fallback path |
 | P2 | `intel-perf-simd-sort` | replace primitive `std::sort` where stable order is not required | float/int sort workload | sortedness + no stability requirement + speedup threshold |
-| P2 | `intel-perf-hotspot-report` | produce a structured report from provided perf artifacts | static `perf stat`, `perf report`, `perf annotate` files | markdown parser checks required sections and no unsupported fix claims |
 
 ## PTS Task Research
 
@@ -103,13 +103,14 @@ For a 60-80 question set, sample from these buckets:
 
 ## Implementation Recommendation
 
-Build tasks in this order:
+The first five tasks have been implemented. Build remaining tasks in this order:
 
-1. `intel-perf-serial-accumulator`
-2. `intel-perf-false-sharing`
-3. `intel-perf-shared-counter`
-4. `intel-perf-missing-restrict`
-5. `intel-perf-hotspot-report`
+1. `intel-perf-ttas-spinlock`
+2. `intel-perf-mutex-rwlock`
+3. `intel-perf-cv-herd`
+4. `intel-perf-crc32c`
+5. `intel-perf-simd-sort`
 
-This gives coverage across code rewrite, concurrency scaling, compiler
-vectorization, and artifact/report interpretation while keeping CI deterministic.
+The implemented first wave gives coverage across code rewrite, concurrency
+scaling, compiler vectorization, and artifact/report interpretation while
+keeping CI deterministic.
