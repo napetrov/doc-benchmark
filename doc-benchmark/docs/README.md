@@ -9,11 +9,14 @@ The idea in three points:
 - So we test it like an experiment: **change one thing, keep everything else
   fixed, measure the delta — and check it is statistically significant.**
 
-```text
- same questions ──► │ model              │ ──► answers ──► judge ──► score A
- same questions ──► │ model + artifact   │ ──► answers ──► judge ──► score B
-
-                    delta = B − A,  p-value = "is this real or noise?"
+```mermaid
+flowchart LR
+    Q([same questions]) --> M1[model]
+    Q --> M2[model + artifact]
+    M1 -- "answers → judge" --> S1([score A])
+    M2 -- "answers → judge" --> S2([score B])
+    S1 --> D{{"delta = B − A<br/>p-value: real or noise?"}}
+    S2 --> D
 ```
 
 ## What can be compared (arms)
@@ -62,22 +65,14 @@ also records a `question_set_hash` to prove question-set reuse across runs.
 
 ## How the evaluation flows
 
-```text
-┌─ 1. QUESTIONS ──────────────────────────────────────────────┐
-│   personas (synthetic users) → generated questions,         │
-│   or curated golden sets                                    │
-├─ 2. ANSWERS ────────────────────────────────────────────────┤
-│   the same model answers every question once per arm;       │
-│   agentic arms also record whether the tool was used        │
-├─ 3. JUDGE ──────────────────────────────────────────────────┤
-│   a separate LLM scores all answers (0–100) on              │
-│   5 dimensions; optional judge panel + RAGAS cross-checks   │
-├─ 4. RESULTS ────────────────────────────────────────────────┤
-│   deltas vs baseline · significance tests · gates ·         │
-│   dashboards — reported per (model × harness × plugins)     │
-└─────────────────────────────────────────────────────────────┘
-        ▼
-  scorecard: "worth +X on model M (p = …)" — ship it or cut it
+```mermaid
+flowchart TD
+    S1["<b>1 · Questions</b><br/>personas (synthetic users) → generated questions,<br/>or curated golden sets"]
+    S2["<b>2 · Answers</b><br/>the same model answers every question once per arm;<br/>agentic arms also record whether the tool was used"]
+    S3["<b>3 · Judge</b><br/>a separate LLM scores all answers (0–100) on 5 dimensions;<br/>optional judge panel + RAGAS cross-checks"]
+    S4["<b>4 · Results</b><br/>deltas vs baseline · significance tests · gates · dashboards<br/>reported per (model × harness × plugins)"]
+    SC(["<b>scorecard</b>: worth +X on model M (p = …) — ship it or cut it"])
+    S1 --> S2 --> S3 --> S4 --> SC
 ```
 
 Two more tracks back this up:
