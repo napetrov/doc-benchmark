@@ -15,6 +15,7 @@ from doc_benchmarks.treatments import (
 from doc_benchmarks.agent_profiles import load_agent_profile, AgentProfile
 from doc_benchmarks.skills import load_skill, Skill
 from doc_benchmarks.plugins import create_plugin, create_plugins, plugin_set_metadata, wrap_treatments
+from doc_benchmarks.commands.arms import _resolve_doc_library_id
 
 
 # ── frontmatter ─────────────────────────────────────────────────────────
@@ -159,6 +160,15 @@ def test_doc_treatment_retrieval_error_is_swallowed():
     cfg = t.prepare("q", "oneTBB", "id")
     assert not cfg.has_context
     assert cfg.metadata["error"] == "retrieval_failed"
+
+
+def test_doc_library_id_resolves_before_or_after_plugin_wrapping():
+    t = DocTreatment(_FakeClient(), rerank_threshold=0.0)
+    wrapped = wrap_treatments([t], [create_plugin("plugin:caveman")])
+
+    assert _resolve_doc_library_id([t], "oneTBB") == "fake/oneTBB"
+    assert _resolve_doc_library_id(wrapped, "oneTBB") == "fake/oneTBB"
+    assert _resolve_doc_library_id(wrapped, "oneTBB", explicit_id="manual/id") == "manual/id"
 
 
 # ── factory ─────────────────────────────────────────────────────────────

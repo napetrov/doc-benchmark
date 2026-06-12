@@ -34,6 +34,7 @@ def cmd_arms_run(args: argparse.Namespace) -> None:
         treatments = create_treatments(
             specs, top_k=args.top_k, rerank_threshold=args.rerank_threshold
         )
+        library_id = _resolve_doc_library_id(treatments, args.product, args.context7_id)
         plugin_specs = [s.strip() for s in args.plugins.split(",") if s.strip()]
         plugins = create_plugins(plugin_specs)
         treatments = wrap_treatments(treatments, plugins)
@@ -44,18 +45,6 @@ def cmd_arms_run(args: argparse.Namespace) -> None:
     print(f"Arms: {', '.join(t.name for t in treatments)}")
     if plugin_set["plugins"]:
         print(f"Plugins: {plugin_set['plugin_set']} ({plugin_set['plugin_set_id']})")
-
-    # Resolve a library id for any doc/MCP arms (best-effort; safe to skip).
-    library_id = args.context7_id
-    if library_id is None:
-        from doc_benchmarks.treatments.arms import DocTreatment
-        for t in treatments:
-            if isinstance(t, DocTreatment):
-                try:
-                    library_id = t.mcp_client.resolve_library_id(args.product)
-                except Exception:
-                    library_id = args.product
-                break
 
     runner = ArmRunner(
         treatments,
@@ -152,3 +141,20 @@ def register(sub, positive_int) -> None:
     arms_run_p.add_argument("--out-md", default=None, dest="out_md",
                             help="Output Markdown report path (default: results/arms/{product}.md)")
     arms_run_p.set_defaults(func=cmd_arms_run)
+
+
+def _resolve_doc_library_id(treatments, product: str, explicit_id=None):
+    """Resolve a library id for the first doc arm, before plugin wrapping."""
+    if explicit_id is not None:
+        return explicit_id
+
+    from doc_benchmarks.treatments.arms import DocTreatment
+
+    for treatment in treatments:
+        unwrapped = getattr(treatment, "inner", treatment)
+        if isinstance(unwrapped, DocTreatment):
+            try:
+                return unwrapped.mcp_client.resolve_library_id(product)
+            except Exception:
+                return product
+    return None
