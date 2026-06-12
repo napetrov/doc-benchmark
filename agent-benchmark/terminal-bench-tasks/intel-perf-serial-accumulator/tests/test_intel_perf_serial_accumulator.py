@@ -24,6 +24,7 @@ def _run(cmd):
 
 
 def _best_time(cmd, rounds=3):
+    _run(cmd)  # warmup: absorb cold-cache and CPU-frequency-ramp effects before timing
     values = []
     elapsed = []
     for _ in range(rounds):

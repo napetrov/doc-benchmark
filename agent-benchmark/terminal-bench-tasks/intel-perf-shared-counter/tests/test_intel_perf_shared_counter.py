@@ -24,6 +24,7 @@ def _run(cmd):
 
 
 def _best(cmd, rounds=3):
+    _run(cmd)  # warmup: absorb cold-cache and CPU-frequency-ramp effects before timing
     last_total = last_checksum = None
     elapsed = []
     for _ in range(rounds):
