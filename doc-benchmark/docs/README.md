@@ -74,10 +74,13 @@ This single table demonstrates the core lessons of the methodology:
    on smaller/cheaper models, where it provably closes the gap; for frontier
    models, collect more samples or accept that it may not pay for its tokens.
 
-Beyond the headline p-value, reports include Wilcoxon signed-rank tests,
-Cohen's d effect size, bootstrap confidence intervals, per-dimension scores
-(correctness, completeness, specificity, code quality, actionability), and
-trust-gate checks.
+Beyond the headline p-value, the two-arm (with/without) evaluation reports
+include Wilcoxon signed-rank tests, Cohen's d effect size, bootstrap
+confidence intervals, per-dimension scores (correctness, completeness,
+specificity, code quality, actionability), and trust-gate checks. The N-way
+`arms run` report currently summarizes per-arm average scores and deltas vs
+baseline; for significance statistics, reduce to a baseline-vs-one-treatment
+comparison (e.g. via `scripts/compare_models.py`).
 
 ## How the evaluation flows
 
@@ -106,8 +109,9 @@ trust-gate checks.
 │    meta-evaluation as cross-checks                             │
 ├────────────────────────────────────────────────────────────────┤
 │ 4. ANALYZE & GATE                                              │
-│    per-arm delta vs baseline · paired t-test / Wilcoxon /      │
-│    Cohen's d · per (model × harness × plugin) cell ·           │
+│    per-arm delta vs baseline (arms report); paired t-test /    │
+│    Wilcoxon / Cohen's d for baseline-vs-treatment pairs ·      │
+│    results per (model × harness × plugin) cell ·               │
 │    trust checks, baselines, regression gates, dashboards       │
 └────────────────────────────┬───────────────────────────────────┘
                              ▼
