@@ -53,8 +53,8 @@ embeddings = ["sentence-transformers>=2.2"]
 agent-benchmark = "agent_benchmarks.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/napetrov/doc-benchmark"
-Repository = "https://github.com/napetrov/doc-benchmark"
+Homepage = "https://github.com/napetrov/agent-benchmark"
+Repository = "https://github.com/napetrov/agent-benchmark"
 
 [tool.setuptools]
 py-modules = ["cli"]
