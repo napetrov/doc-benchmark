@@ -38,7 +38,12 @@ jobs:
             intel-perf-false-sharing \
             intel-perf-shared-counter \
             intel-perf-missing-restrict \
-            intel-perf-hotspot-report
+            intel-perf-hotspot-report \
+            intel-perf-ttas-spinlock \
+            intel-perf-mutex-rwlock \
+            intel-perf-cv-herd \
+            intel-perf-crc32c \
+            intel-perf-simd-sort
           do
             docker build \
               -t "intel-hpc-bench/${task}:latest" \
@@ -60,7 +65,12 @@ jobs:
             intel-perf-false-sharing \
             intel-perf-shared-counter \
             intel-perf-missing-restrict \
-            intel-perf-hotspot-report
+            intel-perf-hotspot-report \
+            intel-perf-ttas-spinlock \
+            intel-perf-mutex-rwlock \
+            intel-perf-cv-herd \
+            intel-perf-crc32c \
+            intel-perf-simd-sort
           do
             mkdir -p "/tmp/logs/${task}"
             docker run --rm \
