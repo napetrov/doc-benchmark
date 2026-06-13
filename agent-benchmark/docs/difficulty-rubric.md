@@ -45,7 +45,7 @@ distribution at backfill time (2026-06-12, 40 questions):
 
 Bold cells are gaps. The set is currently near-diagonal (triage⇒easy,
 end_to_end⇒hard), which prevents isolating skill lift by level *and* difficulty.
-Phase C question growth targets the bold cells first, e.g.:
+Subsequent question growth targets the bold cells first, e.g.:
 
 - `triage × medium/hard`: counter readings with competing signals or a
   "collect more evidence first" correct answer.
@@ -59,7 +59,7 @@ A `metadata.negative_case: true` flag marks items whose correct answer is to
 **withhold a fix** (insufficient evidence, unsafe ABI/FP change, non-editable
 artifact, wrong layer). These are the highest-signal items for distinguishing a
 reasoning skill from keyword matching, and should appear across `medium` and
-`hard` at every level. See Phase B in the evaluation plan.
+`hard` at every level.
 
 ## Applying the rubric
 
