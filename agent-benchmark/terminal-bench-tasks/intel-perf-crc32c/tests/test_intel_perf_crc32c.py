@@ -23,6 +23,27 @@ def _strip_comments(text):
     return re.sub(r"//.*", "", text)
 
 
+def _function_bodies(src):
+    bodies = {}
+    pattern = re.compile(
+        r"\b(?:__attribute__\s*\(\([^)]*\)\)\s*)?(?:static\s+)?(?:inline\s+)?"
+        r"(?:std::)?(?:uint32_t|uint64_t|unsigned|auto)\s+([A-Za-z_]\w*)\s*\([^;{}]*\)\s*"
+        r"(?:__attribute__\s*\(\([^)]*\)\)\s*)?\{"
+    )
+    for match in pattern.finditer(src):
+        start = match.end()
+        depth = 1
+        for pos in range(start, len(src)):
+            if src[pos] == "{":
+                depth += 1
+            elif src[pos] == "}":
+                depth -= 1
+                if depth == 0:
+                    bodies[match.group(1)] = src[start:pos]
+                    break
+    return bodies
+
+
 def _run(cmd):
     start = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
@@ -69,12 +90,38 @@ def test_source_uses_hw_crc_with_dispatch():
     src = _strip_comments(SOURCE.read_text(errors="replace"))
     has_hw = bool(re.search(r"_mm_crc32_u(8|16|32|64)", src))
     has_runtime_probe = bool(re.search(r"__get_cpuid|__builtin_cpu_supports|getauxval|cpuid", src))
-    has_conditional_hw_call = bool(
-        re.search(r"\bif\s*\([^)]*(?:sse|cpu|cpuid|hw)[^)]*\)\s*\{?[^{};]*crc32c_hw", src, re.I | re.S)
-        or re.search(r"\?(?:[^:;]*crc32c_hw[^:;]*):|:[^;]*crc32c_hw[^;]*;", src, re.S)
+    hw_functions = [
+        name
+        for name, body in _function_bodies(src).items()
+        if re.search(r"_mm_crc32_u(8|16|32|64)", body)
+    ]
+    dispatch_blocks = re.findall(
+        r"\bif\s*\([^)]*(?:sse|crc|cpu|cpuid|hw|getauxval)[^)]*\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}",
+        src,
+        flags=re.I | re.S,
+    )
+    guarded_hw = any(re.search(r"_mm_crc32_u(8|16|32|64)", block) for block in dispatch_blocks)
+    guarded_hw = guarded_hw or any(
+        re.search(rf"\b{re.escape(name)}\s*\(", block)
+        for block in dispatch_blocks
+        for name in hw_functions
+    )
+    guarded_hw = guarded_hw or any(
+        re.search(rf"\b(?:sse|crc|cpu|cpuid|hw|getauxval)[^?;]*\?\s*{re.escape(name)}\s*\(", src, re.I | re.S)
+        or re.search(rf"\?\s*[^:;]*:\s*{re.escape(name)}\s*\(", src, re.I | re.S)
+        for name in hw_functions
+    )
+    guarded_hw = guarded_hw or any(
+        re.search(
+            rf"\b(?:return\s+)?{re.escape(name)}\s*\([^;]*\)\s*;",
+            src[max(0, match.start() - 160):match.start()],
+            flags=re.I | re.S,
+        )
+        for name in hw_functions
+        for match in re.finditer(r"__builtin_cpu_supports|__get_cpuid|getauxval|cpuid", src)
     )
     has_fallback = bool(re.search(r"0x82F63B78", src))
     assert has_hw, "use the hardware CRC32C intrinsic (_mm_crc32_u64/_u8)"
     assert has_runtime_probe, "probe CPU support at runtime before using SSE4.2 CRC intrinsics"
-    assert has_conditional_hw_call, "call the hardware CRC path only behind a runtime dispatch check"
+    assert guarded_hw, "call the hardware CRC path only behind a runtime dispatch check"
     assert has_fallback, "keep a portable scalar fallback (reflected 0x82F63B78 polynomial)"

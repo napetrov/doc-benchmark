@@ -69,9 +69,19 @@ def test_source_uses_reader_writer_lock():
     src = _strip_comments(SOURCE.read_text(errors="replace"))
     get_body = _function_body(src, "get")
     bump_body = _function_body(src, "bump")
-    has_shared_mutex = bool(re.search(r"shared_mutex", src))
-    has_shared_lock = bool(re.search(r"shared_lock", get_body))
-    has_unique_lock = bool(re.search(r"unique_lock|lock_guard", bump_body))
-    assert has_shared_mutex, "use std::shared_mutex for the reader-writer lock"
-    assert has_shared_lock, "get() must take a std::shared_lock (shared reader access)"
-    assert has_unique_lock, "bump() must still take an exclusive lock"
+    shared_mutexes = re.findall(r"(?:std::)?shared_mutex\s+([A-Za-z_]\w*)\s*[;{=]", src)
+    assert shared_mutexes, "use std::shared_mutex for the reader-writer lock"
+
+    def locks_shared_mutex(body, lock_type):
+        for mutex in shared_mutexes:
+            templated = rf"(?:std::)?{lock_type}\s*<\s*(?:std::)?shared_mutex\s*>\s+[A-Za-z_]\w*\s*\(\s*{mutex}\s*\)"
+            deduced = rf"(?:std::)?{lock_type}\s+[A-Za-z_]\w*\s*\(\s*{mutex}\s*\)"
+            brace_init = rf"(?:std::)?{lock_type}\s*<\s*(?:std::)?shared_mutex\s*>\s+[A-Za-z_]\w*\s*\{{\s*{mutex}\s*\}}"
+            if re.search(templated, body) or re.search(deduced, body) or re.search(brace_init, body):
+                return True
+        return False
+
+    has_shared_lock = locks_shared_mutex(get_body, "shared_lock")
+    has_unique_lock = locks_shared_mutex(bump_body, "unique_lock") or locks_shared_mutex(bump_body, "lock_guard")
+    assert has_shared_lock, "get() must take a std::shared_lock on the shared_mutex data guard"
+    assert has_unique_lock, "bump() must take an exclusive lock on the same shared_mutex data guard"

@@ -9,6 +9,7 @@ BINARY = Path("/app/sort_fast")
 SOURCE = Path("/app/sort_fast.cpp")
 REFERENCE = Path("/app/sort_bad")
 N = "20000000"
+CORRECTNESS_SIZES = ["137", "104729", "1234567"]
 TIMEOUT = 60.0
 
 
@@ -40,13 +41,19 @@ def test_binary_exists():
 
 
 def test_sorted_same_multiset_and_faster():
+    for size in CORRECTNESS_SIZES:
+        ref_sig, _ = _run([str(REFERENCE), size])
+        fast_sig, _ = _run([str(BINARY), size])
+        tolerance = max(1e-3, abs(ref_sig) * 1e-9)
+        assert abs(ref_sig - fast_sig) <= tolerance, (
+            f"signature mismatch at n={size}: ref={ref_sig} fast={fast_sig}"
+        )
+
     ref_sig, ref_time = _best_time([str(REFERENCE), N])
     fast_sig, fast_time = _best_time([str(BINARY), N])
-    # equal order-sensitive signature => same multiset, fully sorted (the binary
-    # also exits non-zero with NOT_SORTED if any inversion remains)
     tolerance = max(1e-3, abs(ref_sig) * 1e-9)
     assert abs(ref_sig - fast_sig) <= tolerance, (
-        f"signature mismatch (different multiset/order): ref={ref_sig} fast={fast_sig}"
+        f"signature mismatch at n={N}: ref={ref_sig} fast={fast_sig}"
     )
     # radix/vectorized sort beats std::sort comfortably; require >=1.8x.
     # Measured margin is ~4x, so this threshold is conservative.
