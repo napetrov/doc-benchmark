@@ -11,6 +11,26 @@ REFERENCE = Path("/app/rwlock_bad")
 TIMEOUT = 60.0
 
 
+def _strip_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//.*", "", text)
+
+
+def _function_body(src, name):
+    match = re.search(rf"\b{name}\s*\([^)]*\)\s*(?:const\s*)?\{{", src)
+    assert match, f"missing {name}() implementation"
+    start = match.end()
+    depth = 1
+    for pos in range(start, len(src)):
+        if src[pos] == "{":
+            depth += 1
+        elif src[pos] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start:pos]
+    raise AssertionError(f"could not parse {name}() body")
+
+
 def _run(binary, threads, ops):
     cmd = [str(binary), str(threads), str(ops)]
     start = time.perf_counter()
@@ -46,12 +66,12 @@ def test_terminates_under_load():
 
 
 def test_source_uses_reader_writer_lock():
-    text = SOURCE.read_text(errors="replace")
-    no_block = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    src = re.sub(r"//.*", "", no_block)
+    src = _strip_comments(SOURCE.read_text(errors="replace"))
+    get_body = _function_body(src, "get")
+    bump_body = _function_body(src, "bump")
     has_shared_mutex = bool(re.search(r"shared_mutex", src))
-    has_shared_lock = bool(re.search(r"shared_lock", src))
-    has_unique_lock = bool(re.search(r"unique_lock|lock_guard", src))
+    has_shared_lock = bool(re.search(r"shared_lock", get_body))
+    has_unique_lock = bool(re.search(r"unique_lock|lock_guard", bump_body))
     assert has_shared_mutex, "use std::shared_mutex for the reader-writer lock"
-    assert has_shared_lock, "readers must take a std::shared_lock (shared access)"
-    assert has_unique_lock, "writers must still take an exclusive lock"
+    assert has_shared_lock, "get() must take a std::shared_lock (shared reader access)"
+    assert has_unique_lock, "bump() must still take an exclusive lock"

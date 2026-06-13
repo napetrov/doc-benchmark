@@ -18,6 +18,11 @@ KNOWN_LEN = "1000003"
 KNOWN_CRC = 3160327329
 
 
+def _strip_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//.*", "", text)
+
+
 def _run(cmd):
     start = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
@@ -61,13 +66,15 @@ def test_matches_reference_and_is_faster():
 
 
 def test_source_uses_hw_crc_with_dispatch():
-    text = SOURCE.read_text(errors="replace")
-    has_hw = bool(re.search(r"_mm_crc32_u(8|16|32|64)", text))
-    has_dispatch = bool(
-        re.search(r"__get_cpuid|__builtin_cpu_supports|getauxval|cpuid", text)
-        or re.search(r'target\s*\(\s*"sse4', text)
+    src = _strip_comments(SOURCE.read_text(errors="replace"))
+    has_hw = bool(re.search(r"_mm_crc32_u(8|16|32|64)", src))
+    has_runtime_probe = bool(re.search(r"__get_cpuid|__builtin_cpu_supports|getauxval|cpuid", src))
+    has_conditional_hw_call = bool(
+        re.search(r"\bif\s*\([^)]*(?:sse|cpu|cpuid|hw)[^)]*\)\s*\{?[^{};]*crc32c_hw", src, re.I | re.S)
+        or re.search(r"\?(?:[^:;]*crc32c_hw[^:;]*):|:[^;]*crc32c_hw[^;]*;", src, re.S)
     )
-    has_fallback = bool(re.search(r"0x82F63B78", text))
+    has_fallback = bool(re.search(r"0x82F63B78", src))
     assert has_hw, "use the hardware CRC32C intrinsic (_mm_crc32_u64/_u8)"
-    assert has_dispatch, "use runtime CPU dispatch or a target-attributed hardware path"
+    assert has_runtime_probe, "probe CPU support at runtime before using SSE4.2 CRC intrinsics"
+    assert has_conditional_hw_call, "call the hardware CRC path only behind a runtime dispatch check"
     assert has_fallback, "keep a portable scalar fallback (reflected 0x82F63B78 polynomial)"

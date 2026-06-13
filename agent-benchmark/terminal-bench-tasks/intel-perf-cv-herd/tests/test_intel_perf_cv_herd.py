@@ -10,6 +10,26 @@ SOURCE = Path("/app/herd_fixed.cpp")
 TIMEOUT = 60.0
 
 
+def _strip_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//.*", "", text)
+
+
+def _function_body(src, name):
+    match = re.search(rf"\b{name}\s*\([^)]*\)\s*(?:const\s*)?\{{", src)
+    assert match, f"missing {name}() implementation"
+    start = match.end()
+    depth = 1
+    for pos in range(start, len(src)):
+        if src[pos] == "{":
+            depth += 1
+        elif src[pos] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start:pos]
+    raise AssertionError(f"could not parse {name}() body")
+
+
 def _run(workers, njobs):
     cmd = [str(BINARY), str(workers), str(njobs)]
     start = time.perf_counter()
@@ -46,12 +66,8 @@ def test_terminates_no_deadlock():
 
 
 def test_source_reduces_per_job_wakeups():
-    text = SOURCE.read_text(errors="replace")
-    no_block = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    src = re.sub(r"//.*", "", no_block)
+    src = _strip_comments(SOURCE.read_text(errors="replace"))
+    submit_body = _function_body(src, "submit")
     assert re.search(r"notify_one\b", src), "wake a single worker per job with notify_one"
-    # at most one notify_all is acceptable (shutdown); a per-job notify_all is the bug
-    notify_all_count = len(re.findall(r"notify_all\b", src))
-    assert notify_all_count <= 1, (
-        f"found {notify_all_count} notify_all calls; the per-job path must not broadcast"
-    )
+    assert re.search(r"notify_one\b", submit_body), "submit() must wake one worker per job"
+    assert not re.search(r"notify_all\b", submit_body), "submit() must not broadcast per job"

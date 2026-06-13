@@ -10,6 +10,26 @@ SOURCE = Path("/app/spin_fixed.cpp")
 TIMEOUT = 60.0
 
 
+def _strip_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//.*", "", text)
+
+
+def _function_body(src, name):
+    match = re.search(rf"\b{name}\s*\([^)]*\)\s*(?:const\s*)?\{{", src)
+    assert match, f"missing {name}() implementation"
+    start = match.end()
+    depth = 1
+    for pos in range(start, len(src)):
+        if src[pos] == "{":
+            depth += 1
+        elif src[pos] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start:pos]
+    raise AssertionError(f"could not parse {name}() body")
+
+
 def _run(threads, iters):
     cmd = [str(BINARY), str(threads), str(iters)]
     start = time.perf_counter()
@@ -45,12 +65,14 @@ def test_no_livelock_under_high_contention():
 
 
 def test_source_uses_test_and_test_and_set():
-    text = SOURCE.read_text(errors="replace")
+    src = _strip_comments(SOURCE.read_text(errors="replace"))
+    body = _function_body(src, "lock")
     # must spin on an ordinary load (.load(...)) before attempting the atomic
     # exchange/compare_exchange — the defining property of TTAS
-    has_read_spin = bool(re.search(r"\.load\s*\(", text))
-    has_atomic_acquire = bool(
-        re.search(r"\.exchange\s*\(", text) or re.search(r"compare_exchange", text)
-    )
+    load = re.search(r"\bwhile\s*\([^)]*\.load\s*\([^)]*\)[^)]*\)", body, re.S)
+    acquire = re.search(r"\.(?:exchange|compare_exchange(?:_weak|_strong)?)\s*\(", body)
+    has_read_spin = bool(load)
+    has_atomic_acquire = bool(acquire)
     assert has_read_spin, "TTAS must spin on an ordinary read (atomic load) before the exchange"
     assert has_atomic_acquire, "TTAS still needs an atomic exchange/CAS to actually acquire the lock"
+    assert load.start() < acquire.start(), "TTAS load-spin must happen before the atomic acquire attempt"
