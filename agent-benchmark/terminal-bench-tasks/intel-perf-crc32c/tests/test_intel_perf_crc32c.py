@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import os
+import platform
 import re
 import subprocess
 import time
 from pathlib import Path
+
+import pytest
 
 BINARY = Path("/app/crc_fast")
 SOURCE = Path("/app/crc_fast.cpp")
@@ -64,6 +67,17 @@ def _best_time(cmd, rounds=3):
     return val, min(times)
 
 
+def _host_supports_sse42():
+    machine = platform.machine().lower()
+    if machine not in {"x86_64", "amd64", "i386", "i686"}:
+        return False
+    cpuinfo = Path("/proc/cpuinfo")
+    if not cpuinfo.exists():
+        return False
+    flags = cpuinfo.read_text(errors="replace").lower().replace("_", ".")
+    return "sse4.2" in flags
+
+
 def test_binary_exists():
     assert SOURCE.exists(), "write /app/crc_fast.cpp"
     assert BINARY.exists(), "compile /app/crc_fast"
@@ -79,6 +93,8 @@ def test_matches_reference_and_is_faster():
     ref_value, ref_time = _best_time([str(REFERENCE), BIG])
     fast_value, fast_time = _best_time([str(BINARY), BIG])
     assert fast_value == ref_value, f"crc mismatch vs reference: ref={ref_value} fast={fast_value}"
+    if not _host_supports_sse42():
+        pytest.skip("host lacks SSE4.2; scalar fallback is expected and not speed-gated")
     # Hardware CRC32C should clearly beat bit-at-a-time scalar code, but CI
     # hosts vary enough that a 4x gate has rejected valid SSE4.2 oracle runs.
     assert fast_time < ref_time / 3.0, (
