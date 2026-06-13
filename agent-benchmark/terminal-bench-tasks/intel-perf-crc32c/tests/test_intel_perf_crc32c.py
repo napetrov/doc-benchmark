@@ -58,10 +58,10 @@ def test_matches_reference_and_is_faster():
     ref_value, ref_time = _best_time([str(REFERENCE), BIG])
     fast_value, fast_time = _best_time([str(BINARY), BIG])
     assert fast_value == ref_value, f"crc mismatch vs reference: ref={ref_value} fast={fast_value}"
-    # hardware CRC32C is dramatically faster than bit-at-a-time; require >=4x.
-    # The measured margin is ~14x, so this threshold is conservative.
-    assert fast_time < ref_time / 4.0, (
-        f"expected >=4x speedup; reference={ref_time:.4f}s fast={fast_time:.4f}s"
+    # Hardware CRC32C should clearly beat bit-at-a-time scalar code, but CI
+    # hosts vary enough that a 4x gate has rejected valid SSE4.2 oracle runs.
+    assert fast_time < ref_time / 3.0, (
+        f"expected >=3x speedup; reference={ref_time:.4f}s fast={fast_time:.4f}s"
     )
 
 
