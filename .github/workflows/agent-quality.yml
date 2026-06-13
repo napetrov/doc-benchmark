@@ -20,30 +20,22 @@ jobs:
   terminal-bench-verify:
     name: Verify terminal-bench-tasks (oracle solutions)
     runs-on: ubuntu-latest
+    env:
+      TERMINAL_BENCH_TASKS: >-
+        onetbb-parallel-sort onetbb-nstream onetbb-stencil onetbb-transpose
+        onetbb-parallel-reduce onetbb-parallel-scan onetbb-flow-graph
+        intel-perf-serial-accumulator intel-perf-false-sharing
+        intel-perf-shared-counter intel-perf-missing-restrict
+        intel-perf-hotspot-report intel-perf-ttas-spinlock
+        intel-perf-mutex-rwlock intel-perf-cv-herd intel-perf-crc32c
+        intel-perf-simd-sort
     steps:
       - uses: actions/checkout@v4
 
       - name: Build Docker images
         run: |
           set -euo pipefail
-          for task in \
-            onetbb-parallel-sort \
-            onetbb-nstream \
-            onetbb-stencil \
-            onetbb-transpose \
-            onetbb-parallel-reduce \
-            onetbb-parallel-scan \
-            onetbb-flow-graph \
-            intel-perf-serial-accumulator \
-            intel-perf-false-sharing \
-            intel-perf-shared-counter \
-            intel-perf-missing-restrict \
-            intel-perf-hotspot-report \
-            intel-perf-ttas-spinlock \
-            intel-perf-mutex-rwlock \
-            intel-perf-cv-herd \
-            intel-perf-crc32c \
-            intel-perf-simd-sort
+          for task in $TERMINAL_BENCH_TASKS
           do
             docker build \
               -t "intel-hpc-bench/${task}:latest" \
@@ -53,26 +45,10 @@ jobs:
       - name: Run oracle solutions + verifiers inside containers
         run: |
           set -euo pipefail
-          for task in \
-            onetbb-parallel-sort \
-            onetbb-nstream \
-            onetbb-stencil \
-            onetbb-transpose \
-            onetbb-parallel-reduce \
-            onetbb-parallel-scan \
-            onetbb-flow-graph \
-            intel-perf-serial-accumulator \
-            intel-perf-false-sharing \
-            intel-perf-shared-counter \
-            intel-perf-missing-restrict \
-            intel-perf-hotspot-report \
-            intel-perf-ttas-spinlock \
-            intel-perf-mutex-rwlock \
-            intel-perf-cv-herd \
-            intel-perf-crc32c \
-            intel-perf-simd-sort
+          for task in $TERMINAL_BENCH_TASKS
           do
             mkdir -p "/tmp/logs/${task}"
+            chmod 777 "/tmp/logs/${task}"
             docker run --rm \
               --network none \
               --cpus=4 \

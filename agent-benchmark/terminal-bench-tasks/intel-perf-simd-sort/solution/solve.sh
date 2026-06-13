@@ -25,7 +25,9 @@ static void fill(std::vector<float>& v) {
 static inline std::uint32_t fkey(float f) {
     std::uint32_t u;
     std::memcpy(&u, &f, 4);
-    return u ^ (static_cast<std::uint32_t>(static_cast<std::int32_t>(u) >> 31) | 0x80000000u);
+    const std::uint32_t sign = u >> 31;
+    const std::uint32_t mask = (0u - sign) | 0x80000000u;
+    return u ^ mask;
 }
 
 static void radix_sort(std::vector<float>& a) {
